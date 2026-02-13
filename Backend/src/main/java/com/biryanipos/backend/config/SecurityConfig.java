@@ -60,6 +60,7 @@ public class SecurityConfig {
             .requestMatchers("/api/tables/**").authenticated()
             .requestMatchers("/api/payments/**").authenticated()
             .requestMatchers("/api/system/**").hasAnyRole("ADMIN", "MANAGER")
+            .requestMatchers("/api/backup/**").hasAnyRole("ADMIN", "MANAGER")
 
             // Everything else needs authentication
             .anyRequest().authenticated())

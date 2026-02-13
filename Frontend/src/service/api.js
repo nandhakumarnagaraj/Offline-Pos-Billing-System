@@ -52,6 +52,12 @@ export const createMenuItem = (item) => api.post('/menu-items', item);
 export const updateMenuItem = (id, item) => api.put(`/menu-items/${id}`, item);
 export const toggleMenuItemAvailability = (id) => api.put(`/menu-items/${id}/toggle-availability`);
 export const deleteMenuItem = (id) => api.delete(`/menu-items/${id}`);
+export const getRecipeCosting = (id) => api.get(`/menu-items/${id}/costing`);
+export const getAllRecipeCosting = () => api.get('/menu-items/costing');
+export const updateRecipe = (menuItemId, ingredients) => api.put(`/menu-items/${menuItemId}/recipe`, ingredients);
+export const addRecipeIngredient = (menuItemId, ingredient) => api.post(`/menu-items/${menuItemId}/recipe/ingredient`, ingredient);
+export const removeRecipeIngredient = (menuItemId, ingredientId) => api.delete(`/menu-items/${menuItemId}/recipe/ingredient/${ingredientId}`);
+export const clearRecipe = (menuItemId) => api.delete(`/menu-items/${menuItemId}/recipe`);
 
 // Orders
 export const createOrder = (order) => api.post('/orders', order);
@@ -91,11 +97,17 @@ export const deleteExpense = (id) => api.delete(`/expenses/${id}`);
 // Stock
 export const getStockItems = () => api.get('/stock/items');
 export const getLowStockItems = () => api.get('/stock/items/low-stock');
+export const getExpiringStockItems = (days = 7) => api.get(`/stock/transactions/expiring?days=${days}`);
 export const createStockItem = (item) => api.post('/stock/items', item);
 export const updateStockItem = (id, item) => api.put(`/stock/items/${id}`, item);
 export const deleteStockItem = (id) => api.delete(`/stock/items/${id}`);
 export const recordStockTransaction = (tx) => api.post('/stock/transactions', tx);
 export const getWasteTransactions = () => api.get('/stock/transactions/waste');
+
+// Suppliers
+export const getAllSuppliers = () => api.get('/procurement/suppliers');
+export const createSupplier = (s) => api.post('/procurement/suppliers', s);
+export const getExpensesBySupplier = (id) => api.get(`/expenses/supplier/${id}`);
 
 // Reports
 export const getDashboard = () => api.get('/reports/dashboard');

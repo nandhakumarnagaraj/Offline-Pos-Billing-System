@@ -33,6 +33,17 @@ public class Expense {
   @Column(nullable = false)
   private LocalDate expenseDate;
 
+  @ManyToOne
+  @JoinColumn(name = "supplier_id")
+  private Supplier supplier;
+
+  private double gstAmount;
+
+  private boolean isRecurring = false;
+  private String recurringInterval; // MONTHLY, WEEKLY
+
+  private String receiptImageUrl;
+
   private String notes;
 
   private LocalDateTime createdAt;

@@ -23,6 +23,7 @@ public class PaymentService {
   private final PaymentRepository paymentRepository;
   private final OrderRepository orderRepository;
   private final TableRepository tableRepository;
+  private final CustomerService customerService;
   private final SimpMessagingTemplate messagingTemplate;
 
   @Transactional
@@ -30,7 +31,7 @@ public class PaymentService {
     if (request.getOrderId() == null) {
       throw new RuntimeException("Order ID is required");
     }
-    Order order = orderRepository.findById(request.getOrderId())
+    Order order = orderRepository.findById(java.util.Objects.requireNonNull(request.getOrderId()))
         .orElseThrow(() -> new RuntimeException("Order not found: " + request.getOrderId()));
 
     if (order.getPaymentStatus() == PaymentStatus.COMPLETED) {
@@ -46,17 +47,57 @@ public class PaymentService {
 
     Payment payment = new Payment();
     payment.setOrderId(request.getOrderId());
-    payment.setPaymentMode(request.getPaymentMode());
     payment.setPaymentStatus(PaymentStatus.COMPLETED);
     payment.setSubtotal(discountedSubtotal);
     payment.setCgst(cgst);
     payment.setSgst(sgst);
     payment.setTotalAmount(totalAmount);
     payment.setDiscount(discount);
-    payment.setAmountReceived(request.getAmountReceived());
-    payment.setChangeReturned(request.getAmountReceived() > 0 ? request.getAmountReceived() - totalAmount : 0);
     payment.setTransactionRef(request.getTransactionRef());
     payment.setPaidAt(LocalDateTime.now());
+
+    double totalReceived = 0;
+
+    if (request.getPaymentModes() != null && !request.getPaymentModes().isEmpty()) {
+      // Multi-mode payment
+      for (PaymentRequest.PaymentModeDetail detailReq : request.getPaymentModes()) {
+        PaymentDetail detail = new PaymentDetail();
+        detail.setPaymentMode(detailReq.getMode());
+        detail.setAmount(detailReq.getAmount());
+        detail.setTransactionRef(detailReq.getRef());
+        payment.addDetail(detail);
+        totalReceived += detailReq.getAmount();
+      }
+      // Set primary mode as MIXED if multiple, or the single one
+      if (request.getPaymentModes().size() > 1) {
+        payment.setPaymentMode(PaymentMode.MIXED); // Assuming MIXED is added to enum, or use CASH as default/fallback
+      } else {
+        payment.setPaymentMode(request.getPaymentModes().get(0).getMode());
+      }
+    } else {
+      // Legacy single mode
+      PaymentDetail detail = new PaymentDetail();
+      detail.setPaymentMode(request.getPaymentMode());
+      detail.setAmount(request.getAmountReceived() > 0 ? request.getAmountReceived() : totalAmount);
+      detail.setTransactionRef(request.getTransactionRef());
+      payment.addDetail(detail);
+
+      if (request.getPaymentMode() != null) {
+        payment.setPaymentMode(request.getPaymentMode());
+      } else {
+        payment.setPaymentMode(PaymentMode.CASH);
+        detail.setPaymentMode(PaymentMode.CASH);
+      }
+      totalReceived = request.getAmountReceived();
+    }
+
+    // If totalReceived is 0 (e.g. card payment exact), assume they paid totalAmount
+    if (totalReceived <= 0 && payment.getPaymentMode() != PaymentMode.CASH) {
+      totalReceived = totalAmount;
+    }
+
+    payment.setAmountReceived(totalReceived);
+    payment.setChangeReturned(totalReceived > totalAmount ? totalReceived - totalAmount : 0);
 
     Payment savedPayment = paymentRepository.save(payment);
 
@@ -81,6 +122,11 @@ public class PaymentService {
         tableRepository.save(table);
         messagingTemplate.convertAndSend("/topic/tables", "TABLE_UPDATE");
       });
+    }
+
+    // Record customer visit for loyalty points
+    if (order.getCustomerPhone() != null) {
+      customerService.recordVisit(order.getCustomerPhone(), totalAmount);
     }
 
     return savedPayment;

@@ -61,12 +61,16 @@ public class StockService {
     transaction.setStockItem(item);
     transaction.setTransactionType(request.getTransactionType());
     transaction.setQuantity(request.getQuantity());
+    transaction.setUnitCostSnapshot(item.getCostPerUnit());
     transaction.setReason(request.getReason());
     transaction.setOrderId(request.getOrderId());
+    transaction.setExpiryDate(request.getExpiryDate());
+    transaction.setWasteCategory(request.getWasteCategory());
 
     // Update stock levels based on transaction type
     switch (request.getTransactionType()) {
       case PURCHASE:
+      case RETURN_FROM_ORDER:
         item.setCurrentStock(item.getCurrentStock() + request.getQuantity());
         break;
       case ISSUE_TO_KITCHEN:
@@ -80,6 +84,7 @@ public class StockService {
         break;
       case ADJUSTMENT:
         item.setCurrentStock(request.getQuantity()); // Direct set
+        item.setLastAuditDate(java.time.LocalDateTime.now());
         break;
     }
 
@@ -89,10 +94,15 @@ public class StockService {
     // Notify if low stock
     if (item.isLowStock()) {
       messagingTemplate.convertAndSend("/topic/stock/alerts",
-          "LOW STOCK: " + item.getName() + " (" + item.getCurrentStock() + " " + item.getUnit() + " remaining)");
+          "RUNNING OUT OF STOCK: " + item.getName() + " (" + item.getCurrentStock() + " " + item.getUnit()
+              + " remaining)");
     }
 
     return saved;
+  }
+
+  public List<StockTransaction> getExpiringItems(int days) {
+    return stockTransactionRepository.findExpiringByDate(java.time.LocalDate.now().plusDays(days));
   }
 
   public List<StockTransaction> getTransactionsByItem(Long stockItemId) {

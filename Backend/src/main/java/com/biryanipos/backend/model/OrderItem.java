@@ -28,6 +28,10 @@ public class OrderItem {
 
   private double price; // Snapshot price
 
+  @Column(nullable = false, columnDefinition = "varchar(255) default 'NEW'")
+  @Enumerated(EnumType.STRING)
+  private OrderStatus status = OrderStatus.NEW;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "order_id")
   @JsonIgnore

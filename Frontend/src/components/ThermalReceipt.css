@@ -1,0 +1,151 @@
+/* Thermal Receipt Styling */
+.thermal-receipt-wrap {
+  display: none;
+  /* Hidden by default in UI */
+}
+
+@media print {
+
+  /* Hide everything except the receipt when printing */
+  body * {
+    visibility: hidden;
+  }
+
+  .thermal-receipt-wrap,
+  .thermal-receipt-wrap * {
+    visibility: visible;
+  }
+
+  .thermal-receipt-wrap {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    /* Standard Thermal printer width */
+    padding: 0;
+    margin: 0;
+    background: white;
+    color: black;
+  }
+}
+
+.thermal-receipt {
+  width: 100%;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 10px;
+  background: white;
+  color: black;
+}
+
+.receipt-header {
+  text-align: center;
+  margin-bottom: 5px;
+}
+
+.store-name {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.store-tagline {
+  font-size: 10px;
+  margin: 2px 0;
+}
+
+.store-fssai {
+  font-size: 9px;
+  font-weight: bold;
+  margin: 2px 0;
+}
+
+.footer-small {
+  font-size: 9px;
+  margin: 2px 0;
+}
+
+.receipt-divider {
+  font-size: 12px;
+  letter-spacing: -1px;
+  margin: 2px 0;
+  text-align: center;
+}
+
+.receipt-info {
+  font-size: 11px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 1px 0;
+}
+
+.receipt-items {
+  margin: 10px 0;
+}
+
+.item-header {
+  display: flex;
+  font-weight: 800;
+  font-size: 10px;
+}
+
+.item-row {
+  display: flex;
+  margin: 3px 0;
+  font-size: 11px;
+}
+
+.col-name {
+  flex: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-qty {
+  flex: 0.5;
+  text-align: center;
+}
+
+.col-price {
+  flex: 0.7;
+  text-align: right;
+}
+
+.col-total {
+  flex: 0.7;
+  text-align: right;
+}
+
+.receipt-totals {
+  margin: 5px 0;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 2px 0;
+  font-size: 11px;
+}
+
+.grand-total {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.receipt-footer {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.software-credit {
+  font-size: 8px;
+  color: #666;
+  margin-top: 10px;
+}

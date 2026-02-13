@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getAvailableMenuItems, createOrder, getActiveOrders, getTables, getActiveCategories } from '../service/api';
+import { getAvailableMenuItems, createOrder, addItemsToOrder, getActiveOrders, getTables, getActiveCategories } from '../service/api';
 import { connectWebSocket } from '../service/ws';
+import { saveOfflineOrder } from '../db';
 import { useAuth } from '../context/AuthContext';
 import './WaiterPage.css';
 
@@ -21,23 +22,30 @@ function WaiterPage() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [showVariationModal, setShowVariationModal] = useState(null); // { item }
+  const [stockAlerts, setStockAlerts] = useState([]);
 
   useEffect(() => {
     loadData();
-    const stompClient = connectWebSocket((order) => {
-      setActiveOrders(prev => {
-        const index = prev.findIndex(o => o.id === order.id);
-        if (index !== -1) {
-          const updated = [...prev];
-          updated[index] = order;
-          return updated;
-        }
-        return [order, ...prev];
-      });
-    }, () => {
-      // On table update, refresh table list
-      getTables().then(res => setTables(res.data));
-    });
+    const stompClient = connectWebSocket(
+      (order) => {
+        setActiveOrders(prev => {
+          const index = prev.findIndex(o => o.id === order.id);
+          if (index !== -1) {
+            const updated = [...prev];
+            updated[index] = order;
+            return updated;
+          }
+          return [order, ...prev];
+        });
+      },
+      () => {
+        // On table update, refresh table list
+        getTables().then(res => setTables(res.data));
+      },
+      (alert) => {
+        setStockAlerts(prev => [alert, ...prev].slice(0, 3));
+      }
+    );
     return () => { if (stompClient) stompClient.deactivate(); };
   }, []);
 
@@ -100,7 +108,7 @@ function WaiterPage() {
   const cartItemCount = Object.values(cart).reduce((sum, c) => sum + c.qty, 0);
 
   const selectTable = (table) => {
-    if (table.status === 'OCCUPIED') return;
+    // Allow selecting occupied tables to add more items
     setSelectedTable(table.tableNumber);
     setView('menu');
   };
@@ -123,15 +131,26 @@ function WaiterPage() {
 
     setLoading(true);
     try {
-      await createOrder({
-        customerName,
-        customerPhone,
-        tableNumber: orderType === 'DINE_IN' ? selectedTable : 'TAKEAWAY',
-        orderType,
-        createdBy: 'Waiter',
-        items: orderItems
-      });
-      alert('✅ Order placed successfully!');
+      // Check if there's an existing active order for this table
+      const existingOrder = orderType === 'DINE_IN'
+        ? activeOrders.find(o => o.tableNumber === selectedTable && o.status !== 'PAID' && o.status !== 'CANCELLED')
+        : null;
+
+      if (existingOrder) {
+        await addItemsToOrder(existingOrder.id, orderItems);
+        alert(`✅ Items added to existing Order #${existingOrder.id}!`);
+      } else {
+        await createOrder({
+          customerName,
+          customerPhone,
+          tableNumber: orderType === 'DINE_IN' ? selectedTable : 'TAKEAWAY',
+          orderType,
+          createdBy: 'Waiter',
+          items: orderItems
+        });
+        alert('✅ Order placed successfully!');
+      }
+
       setCart({});
       setCustomerName('');
       setCustomerPhone('');
@@ -139,13 +158,43 @@ function WaiterPage() {
       setView('orders');
       loadData();
     } catch (err) {
-      alert('❌ Failed to place order: ' + (err.response?.data?.message || err.message));
+      if (!navigator.onLine || err.code === 'ERR_NETWORK') {
+        const offlineOrder = {
+          customerName,
+          customerPhone,
+          tableNumber: orderType === 'DINE_IN' ? selectedTable : 'TAKEAWAY',
+          orderType,
+          createdBy: 'Waiter',
+          items: orderItems,
+          status: 'PENDING'
+        };
+        await saveOfflineOrder(offlineOrder);
+        alert('📡 Network error: Order saved LOCALLY. It will sync automatically when online.');
+
+        setCart({});
+        setCustomerName('');
+        setCustomerPhone('');
+        setSelectedTable('');
+        setView('orders');
+      } else {
+        alert('❌ Failed to place order: ' + (err.response?.data?.message || err.message));
+      }
     }
     setLoading(false);
   };
 
   return (
     <div className="waiter-page">
+      {stockAlerts.length > 0 && (
+        <div className="waiter-alerts">
+          {stockAlerts.map((alert, i) => (
+            <div key={i} className="waiter-alert-item animate-slideRight">
+              <span>🛑 {alert}</span>
+              <button className="close-alert" onClick={() => setStockAlerts(prev => prev.filter((_, idx) => idx !== i))}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
       {/* Header */}
       <header className="waiter-header">
         <div className="header-left">
@@ -203,7 +252,11 @@ function WaiterPage() {
             <div className="menu-top-bar">
               <div className="selected-info">
                 {orderType === 'DINE_IN' && selectedTable && (
-                  <span className="selected-table">📍 Table: {selectedTable}</span>
+                  <span className="selected-table">
+                    📍 Table: {selectedTable}
+                    {activeOrders.some(o => o.tableNumber === selectedTable && o.status !== 'PAID' && o.status !== 'CANCELLED') &&
+                      <span className="badge badge-warning ml-2" style={{ marginLeft: '10px', fontSize: '0.8em' }}>Adding to active order</span>}
+                  </span>
                 )}
                 {orderType === 'TAKEAWAY' && (
                   <span className="selected-table">🛍️ Takeaway Order</span>

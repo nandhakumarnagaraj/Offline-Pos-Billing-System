@@ -19,4 +19,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
   @Query("SELECT SUM(e.amount) FROM Expense e WHERE e.expenseDate BETWEEN :start AND :end")
   Double sumAmountBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+  List<Expense> findByIsRecurringTrue();
+
+  List<Expense> findBySupplierId(Long supplierId);
 }

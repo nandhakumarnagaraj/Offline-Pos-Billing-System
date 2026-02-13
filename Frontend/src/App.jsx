@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { getDashboard } from './service/api';
+import SyncManager from './components/SyncManager';
 import './App.css';
 
 // Lazy Load Pages for Performance
@@ -142,6 +143,7 @@ const Home = () => {
 function App() {
   return (
     <AuthProvider>
+      <SyncManager />
       <Router>
         <Suspense fallback={<LoadingFallback />}>
           <Routes>

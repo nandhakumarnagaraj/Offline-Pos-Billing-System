@@ -20,6 +20,9 @@ public class MenuItem {
   @Column(nullable = false)
   private String name;
 
+  @Column(unique = true)
+  private String barcode;
+
   private String description;
 
   @Column(nullable = false)
@@ -38,30 +41,48 @@ public class MenuItem {
   private String imageUrl;
 
   // GST percentage for this item (default 5% for restaurant food)
-  @Column(nullable = false)
+  @Column(nullable = false, columnDefinition = "double precision default 5.0")
   @Builder.Default
   private double gstPercent = 5.0;
 
   // Preparation time in minutes (for KDS)
+  @Column(nullable = false, columnDefinition = "integer default 15")
   @Builder.Default
   private int prepTimeMinutes = 15;
 
   // Is this a vegetarian item?
+  @Column(nullable = false, columnDefinition = "boolean default false")
   @Builder.Default
   private boolean vegetarian = false;
 
   // Display order within category
+  @Column(nullable = false, columnDefinition = "integer default 0")
   @Builder.Default
   private int displayOrder = 0;
+
+  private String preparationStation; // e.g., "Main Kitchen", "Bar", "Dessert Station"
 
   @OneToMany(mappedBy = "menuItem", cascade = CascadeType.ALL, orphanRemoval = true)
   @Builder.Default
   private java.util.List<MenuItemVariation> variations = new java.util.ArrayList<>();
 
-  // Explicit constructor for backward compatibility with 12 parameters
+  @OneToMany(mappedBy = "menuItem", cascade = CascadeType.ALL, orphanRemoval = true)
+  @Builder.Default
+  private java.util.List<MenuItemIngredient> ingredients = new java.util.ArrayList<>();
+
+  // Inventory tracking for this specific item (e.g., for bottled drinks)
+  @Column(nullable = false, columnDefinition = "boolean default false")
+  @Builder.Default
+  private boolean trackStock = false;
+
+  @Column(nullable = false, columnDefinition = "double precision default 0.0")
+  @Builder.Default
+  private double stockLevel = 0.0;
+
+  // Explicit constructor for backward compatibility
   public MenuItem(Long id, String name, String description, double price, String category, Long categoryId,
       boolean available, String imageUrl, double gstPercent, int prepTimeMinutes, boolean vegetarian,
-      int displayOrder) {
+      int displayOrder, boolean trackStock, double stockLevel, String preparationStation) {
     this.id = id;
     this.name = name;
     this.description = description;
@@ -74,7 +95,18 @@ public class MenuItem {
     this.prepTimeMinutes = prepTimeMinutes;
     this.vegetarian = vegetarian;
     this.displayOrder = displayOrder;
+    this.trackStock = trackStock;
+    this.stockLevel = stockLevel;
+    this.preparationStation = preparationStation;
     this.variations = new java.util.ArrayList<>();
+  }
+
+  // Legacy constructor for simpler seed data
+  public MenuItem(Long id, String name, String description, double price, String category, Long categoryId,
+      boolean available, String imageUrl, double gstPercent, int prepTimeMinutes, boolean vegetarian,
+      int displayOrder, boolean trackStock, double stockLevel) {
+    this(id, name, description, price, category, categoryId, available, imageUrl, gstPercent, prepTimeMinutes,
+        vegetarian, displayOrder, trackStock, stockLevel, null);
   }
 
   public void setVariations(java.util.List<MenuItemVariation> variations) {
@@ -89,6 +121,20 @@ public class MenuItem {
   public void addVariation(MenuItemVariation variation) {
     variations.add(variation);
     variation.setMenuItem(this);
+  }
+
+  public void setIngredients(java.util.List<MenuItemIngredient> ingredients) {
+    this.ingredients.clear();
+    if (ingredients != null) {
+      for (MenuItemIngredient ingredient : ingredients) {
+        addIngredient(ingredient);
+      }
+    }
+  }
+
+  public void addIngredient(MenuItemIngredient ingredient) {
+    ingredients.add(ingredient);
+    ingredient.setMenuItem(this);
   }
 
   public double getDisplayPrice() {

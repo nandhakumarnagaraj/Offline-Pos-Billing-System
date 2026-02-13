@@ -34,4 +34,12 @@ public class ReportController {
     LocalDate today = LocalDate.now();
     return ResponseEntity.ok(reportService.getSalesReport(today, today));
   }
+
+  @GetMapping("/gst-export")
+  public ResponseEntity<String> getGstReport(@RequestParam String start, @RequestParam String end) {
+    String csv = reportService.generateGstReportCsv(LocalDate.parse(start), LocalDate.parse(end));
+    return ResponseEntity.ok()
+        .header("Content-Disposition", "attachment; filename=gst_report.csv")
+        .body(csv);
+  }
 }

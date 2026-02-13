@@ -9,5 +9,7 @@ public class StockTransactionRequest {
   private StockTransactionType transactionType;
   private double quantity;
   private String reason;
+  private String wasteCategory;
+  private java.time.LocalDate expiryDate;
   private Long orderId; // optional
 }

@@ -317,3 +317,39 @@
 .mt-2 {
   margin-top: 8px;
 }
+
+/* Item Status Enhancements */
+.item-done {
+  opacity: 0.4;
+}
+
+.kds-item-status {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  text-transform: uppercase;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.status-new {
+  color: #EF4444;
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.status-cooking {
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.status-ready {
+  color: #10B981;
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.status-served {
+  color: #9CA3AF;
+  background: rgba(107, 114, 128, 0.2);
+}

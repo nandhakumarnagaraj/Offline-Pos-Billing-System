@@ -3,7 +3,7 @@ import SockJS from 'sockjs-client';
 
 const SOCKET_URL = `http://${window.location.hostname}:8080/ws`;
 
-export const connectWebSocket = (onOrderReceived, onTableUpdate) => {
+export const connectWebSocket = (onOrderReceived, onTableUpdate, onStockAlert) => {
   const client = new Client({
     webSocketFactory: () => new SockJS(SOCKET_URL),
     onConnect: () => {
@@ -16,6 +16,9 @@ export const connectWebSocket = (onOrderReceived, onTableUpdate) => {
       });
       client.subscribe('/topic/tables', (message) => {
         if (onTableUpdate) onTableUpdate(message.body);
+      });
+      client.subscribe('/topic/stock/alerts', (message) => {
+        if (onStockAlert) onStockAlert(message.body);
       });
     },
     onStompError: (frame) => {

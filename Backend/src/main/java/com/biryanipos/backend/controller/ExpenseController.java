@@ -63,4 +63,9 @@ public class ExpenseController {
     return ResponseEntity.ok(expenseService.getTotalExpenses(
         LocalDate.parse(start), LocalDate.parse(end)));
   }
+
+  @GetMapping("/supplier/{supplierId}")
+  public ResponseEntity<List<Expense>> getBySupplier(@PathVariable Long supplierId) {
+    return ResponseEntity.ok(expenseService.getExpensesBySupplier(supplierId));
+  }
 }

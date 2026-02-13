@@ -66,4 +66,44 @@ public class MenuItemController {
     menuItemService.deleteItem(id);
     return ResponseEntity.ok().build();
   }
+
+  @GetMapping("/costing")
+  public ResponseEntity<List<com.biryanipos.backend.dto.RecipeCostingDto>> getAllCosting() {
+    return ResponseEntity.ok(menuItemService.getAllRecipeCosting());
+  }
+
+  @GetMapping("/{id}/costing")
+  public ResponseEntity<com.biryanipos.backend.dto.RecipeCostingDto> getItemCosting(@PathVariable Long id) {
+    return ResponseEntity.ok(menuItemService.getRecipeCosting(id));
+  }
+
+  @PutMapping("/{id}/recipe")
+  public ResponseEntity<com.biryanipos.backend.dto.RecipeCostingDto> updateRecipe(
+      @PathVariable Long id,
+      @RequestBody java.util.List<com.biryanipos.backend.dto.RecipeIngredientRequest> ingredients) {
+    menuItemService.updateRecipe(id, ingredients);
+    return ResponseEntity.ok(menuItemService.getRecipeCosting(id));
+  }
+
+  @PostMapping("/{id}/recipe/ingredient")
+  public ResponseEntity<com.biryanipos.backend.dto.RecipeCostingDto> addIngredient(
+      @PathVariable Long id,
+      @RequestBody com.biryanipos.backend.dto.RecipeIngredientRequest request) {
+    menuItemService.addIngredientToRecipe(id, request);
+    return ResponseEntity.ok(menuItemService.getRecipeCosting(id));
+  }
+
+  @DeleteMapping("/{menuItemId}/recipe/ingredient/{ingredientId}")
+  public ResponseEntity<com.biryanipos.backend.dto.RecipeCostingDto> removeIngredient(
+      @PathVariable Long menuItemId,
+      @PathVariable Long ingredientId) {
+    menuItemService.removeIngredientFromRecipe(menuItemId, ingredientId);
+    return ResponseEntity.ok(menuItemService.getRecipeCosting(menuItemId));
+  }
+
+  @DeleteMapping("/{id}/recipe")
+  public ResponseEntity<Void> clearRecipe(@PathVariable Long id) {
+    menuItemService.clearRecipe(id);
+    return ResponseEntity.ok().build();
+  }
 }

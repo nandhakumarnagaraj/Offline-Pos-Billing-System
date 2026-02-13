@@ -61,4 +61,9 @@ public class StockController {
   public ResponseEntity<List<StockTransaction>> getWasteTransactions() {
     return ResponseEntity.ok(stockService.getWasteTransactions());
   }
+
+  @GetMapping("/transactions/expiring")
+  public ResponseEntity<List<StockTransaction>> getExpiringItems(@RequestParam(defaultValue = "7") int days) {
+    return ResponseEntity.ok(stockService.getExpiringItems(days));
+  }
 }

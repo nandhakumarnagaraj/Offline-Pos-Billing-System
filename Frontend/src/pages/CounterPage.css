@@ -16,6 +16,65 @@
   gap: 12px;
 }
 
+/* Alerts */
+.counter-alerts {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  width: 350px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.counter-alert-item {
+  background: #fee2e2;
+  border-left: 4px solid #ef4444;
+  padding: 14px 18px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #b91c1c;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.close-alert {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-xs {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+}
+
 .counter-header-left {
   display: flex;
   align-items: center;
@@ -380,4 +439,63 @@
   .counter-header {
     flex-direction: column;
   }
+}
+
+/* Multi Pay Styles */
+.multi-pay-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payment-summary-box {
+  background: var(--bg-secondary);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.add-payment-row {
+  display: flex;
+  gap: 8px;
+}
+
+.add-payment-row select {
+  flex: 1;
+}
+
+.add-payment-row input {
+  flex: 1;
+}
+
+.added-payments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.added-payment-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
 }

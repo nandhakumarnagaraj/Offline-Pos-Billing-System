@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Data
@@ -46,6 +48,14 @@ public class Payment {
   private double changeReturned;
 
   private String transactionRef; // UPI ref / card auth code
+
+  @OneToMany(mappedBy = "payment", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<PaymentDetail> details = new ArrayList<>();
+
+  public void addDetail(PaymentDetail detail) {
+    details.add(detail);
+    detail.setPayment(this);
+  }
 
   private LocalDateTime paidAt;
 

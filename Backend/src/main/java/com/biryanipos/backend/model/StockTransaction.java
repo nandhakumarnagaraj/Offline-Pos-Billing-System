@@ -27,7 +27,15 @@ public class StockTransaction {
   @Column(nullable = false)
   private double quantity;
 
+  @Column(nullable = false, columnDefinition = "double precision default 0.0")
+
+  private double unitCostSnapshot; // Unit cost at the time of transaction for COGS
+
   private String reason; // e.g., "Expired", "Damaged", "Daily kitchen issue"
+
+  private String wasteCategory; // SPOILAGE, PREP_ERROR, DAMAGED, CUSTOMER_RETURN
+
+  private java.time.LocalDate expiryDate; // For PURCHASE transactions
 
   private Long orderId; // If linked to an order (ORDER_DEDUCT type)
 

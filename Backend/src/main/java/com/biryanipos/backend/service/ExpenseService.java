@@ -13,6 +13,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ExpenseService {
   private final ExpenseRepository expenseRepository;
+  private final com.biryanipos.backend.repository.SupplierRepository supplierRepository;
 
   public Expense createExpense(ExpenseRequest request) {
     Expense expense = new Expense();
@@ -23,7 +24,21 @@ public class ExpenseService {
     expense.setPaymentMethod(request.getPaymentMethod());
     expense.setExpenseDate(request.getExpenseDate() != null ? request.getExpenseDate() : LocalDate.now());
     expense.setNotes(request.getNotes());
+
+    expense.setGstAmount(request.getGstAmount());
+    expense.setRecurring(request.isRecurring());
+    expense.setRecurringInterval(request.getRecurringInterval());
+    expense.setReceiptImageUrl(request.getReceiptImageUrl());
+
+    if (request.getSupplierId() != null) {
+      supplierRepository.findById(request.getSupplierId()).ifPresent(expense::setSupplier);
+    }
+
     return expenseRepository.save(expense);
+  }
+
+  public List<Expense> getExpensesBySupplier(Long supplierId) {
+    return expenseRepository.findBySupplierId(supplierId);
   }
 
   public Expense updateExpense(Long id, ExpenseRequest request) {

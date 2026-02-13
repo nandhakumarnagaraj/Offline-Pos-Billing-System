@@ -22,6 +22,18 @@ public class MenuItemVariation {
   @Column(nullable = false)
   private double price;
 
+  @Column(nullable = false, columnDefinition = "double precision default 1.0")
+  private double stockMultiplier = 1.0; // Multiplier for ingredient usage (e.g. 0.5 for half portion)
+
+  // Explicit constructor for backward compatibility
+  public MenuItemVariation(Long id, String name, double price, MenuItem menuItem) {
+    this.id = id;
+    this.name = name;
+    this.price = price;
+    this.menuItem = menuItem;
+    this.stockMultiplier = 1.0;
+  }
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "menu_item_id")
   @JsonIgnore

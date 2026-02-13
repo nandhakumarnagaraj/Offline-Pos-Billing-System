@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   getDashboard, getSalesReport, getDailyReport,
   getMenuItems, createMenuItem, updateMenuItem, toggleMenuItemAvailability, deleteMenuItem,
@@ -8,10 +10,31 @@ import {
   getExpenses, getTodayExpenses, createExpense, deleteExpense,
   getTables, createTable,
   triggerBackup,
-  getAllUsers, createUser, resetUserPassword, toggleUserActive
+  getAllUsers, createUser, resetUserPassword, toggleUserActive,
+  getExpiringStockItems, getAllSuppliers, getAllRecipeCosting,
+  getExpensesBySupplier,
+  updateRecipe, removeRecipeIngredient, clearRecipe
 } from '../service/api';
+import { connectWebSocket } from '../service/ws';
 import { useAuth } from '../context/AuthContext';
 import './ManagerPage.css';
+
+const Modal = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content animate-slideUp" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h4>{title}</h4>
+          <button className="modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <div className="modal-body">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 function ManagerPage() {
   const { logout, user } = useAuth();
@@ -21,10 +44,21 @@ function ManagerPage() {
   const [categories, setCategories] = useState([]);
   const [stockItems, setStockItems] = useState([]);
   const [lowStock, setLowStock] = useState([]);
+  const [expiringStock, setExpiringStock] = useState([]);
+  const [stockAlerts, setStockAlerts] = useState([]);
+  const [wasteData, setWasteData] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [recipeCosts, setRecipeCosts] = useState([]);
+  const [recipeSearch, setRecipeSearch] = useState('');
+  const [recipePage, setRecipePage] = useState(1);
+  const RECIPES_PER_PAGE = 9;
+  const [expenseSearch, setExpenseSearch] = useState('');
+  const [expensePage, setExpensePage] = useState(1);
+  const EXPENSES_PER_PAGE = 9;
+  const [selectedSupplier, setSelectedSupplier] = useState('');
   const [tables, setTables] = useState([]);
   const [users, setUsers] = useState([]);
-  const [wasteData, setWasteData] = useState([]);
   const [salesReport, setSalesReport] = useState(null);
   const [dateRange, setDateRange] = useState({ start: new Date().toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] });
 
@@ -33,18 +67,47 @@ function ManagerPage() {
   const [menuActiveCategory, setMenuActiveCategory] = useState('All');
 
   // Forms
-  const [newItem, setNewItem] = useState({ name: '', description: '', price: '', category: 'Biryani', imageUrl: '', vegetarian: false, prepTimeMinutes: 15, variations: [] });
-  const [newExpense, setNewExpense] = useState({ category: 'UTILITY', description: '', amount: '', paymentMethod: 'CASH' });
-  const [newStock, setNewStock] = useState({ name: '', unit: 'KG', reorderLevel: '', costPerUnit: '', supplier: '' });
+  const [newItem, setNewItem] = useState({
+    name: '', description: '', price: '', category: 'Biryani',
+    imageUrl: '', vegetarian: false, prepTimeMinutes: 15,
+    variations: [], trackStock: false, stockLevel: 0
+  });
+  const [newExpense, setNewExpense] = useState({
+    category: 'UTILITY', description: '', amount: '', paymentMethod: 'CASH',
+    gstAmount: '', supplierId: '', isRecurring: false, recurringInterval: 'MONTHLY'
+  });
+  const [newStock, setNewStock] = useState({ name: '', unit: 'KG', reorderLevel: '', costPerUnit: '', supplierId: '' });
   const [newUser, setNewUser] = useState({ username: '', displayName: '', role: 'WAITER' });
-  const [stockTx, setStockTx] = useState({ stockItemId: '', transactionType: 'PURCHASE', quantity: '', reason: '' });
+  const [stockTx, setStockTx] = useState({
+    stockItemId: '', transactionType: 'PURCHASE', quantity: '',
+    reason: '', expiryDate: '', wasteCategory: 'SPOILAGE'
+  });
   const [newCategory, setNewCategory] = useState({ name: '', description: '' });
   const [newTable, setNewTable] = useState({ tableNumber: '', capacity: 4 });
   const [showForm, setShowForm] = useState('');
   const [showCategoryMgr, setShowCategoryMgr] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
+  const [editingRecipeId, setEditingRecipeId] = useState(null);
+  const [editRecipeIngredients, setEditRecipeIngredients] = useState([]);
 
-  useEffect(() => { loadDashboard(); }, []);
+  useEffect(() => {
+    loadDashboard();
+    const sc = connectWebSocket(
+      null,
+      () => loadDashboard(),
+      (msg) => {
+        setStockAlerts(prev => [msg, ...prev].slice(0, 5));
+        loadStock(); // Refresh stock list when an alert happens
+      }
+    );
+    return () => sc.deactivate();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      loadReport();
+    }
+  }, [activeTab, dateRange]);
 
   const loadDashboard = async () => {
     try {
@@ -60,17 +123,25 @@ function ManagerPage() {
   };
 
   const loadStock = async () => {
-    const [stockRes, lowRes, wasteRes] = await Promise.all([
-      getStockItems(), getLowStockItems(), getWasteTransactions()
+    const [stockRes, lowRes, wasteRes, expiringRes] = await Promise.all([
+      getStockItems(), getLowStockItems(), getWasteTransactions(), getExpiringStockItems(7)
     ]);
     setStockItems(stockRes.data);
     setLowStock(lowRes.data);
     setWasteData(wasteRes.data);
+    setExpiringStock(expiringRes.data);
   };
 
-  const loadExpenses = async () => {
-    const res = await getTodayExpenses();
-    setExpenses(res.data);
+  const loadExpenses = async (supplierId) => {
+    let expRes;
+    if (supplierId) {
+      expRes = await getExpensesBySupplier(supplierId);
+    } else {
+      expRes = await getTodayExpenses();
+    }
+    const supRes = await getAllSuppliers();
+    setExpenses(expRes.data);
+    setSuppliers(supRes.data);
   };
 
   const loadTables = async () => {
@@ -88,6 +159,77 @@ function ManagerPage() {
   const loadReport = async () => {
     const res = await getSalesReport(dateRange.start, dateRange.end);
     setSalesReport(res.data);
+  };
+
+  const downloadReportPDF = () => {
+    if (!salesReport) return;
+    const doc = new jsPDF();
+    const primaryColor = [15, 23, 42]; // Slate 900
+
+    // Header section
+    doc.setFillColor(...primaryColor);
+    doc.rect(0, 0, 210, 45, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.text('POS SALES REPORT', 24, 25);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 24, 32);
+    doc.text(`Reporting Period: ${dateRange.start} to ${dateRange.end}`, 24, 37);
+
+    // Summary Section
+    doc.setTextColor(...primaryColor);
+    doc.setFontSize(16);
+    doc.text('1. Business Performance Summary', 20, 60);
+
+    autoTable(doc, {
+      startY: 65,
+      head: [['Metric', 'Value']],
+      body: [
+        ['Total Gross Revenue', `INR ${salesReport.totalRevenue?.toFixed(2)}`],
+        ['Total Net Profit', `INR ${salesReport.netProfit?.toFixed(2)}`],
+        ['Total GST Collected', `INR ${salesReport.totalGst?.toFixed(2)}`],
+        ['Total Orders Processed', `${salesReport.totalOrders}`],
+        ['Successful (Paid) Orders', `${salesReport.paidOrders || 0}`],
+        ['Cancelled Orders', `${salesReport.cancelledOrders || 0}`],
+        ['Dine-In Orders', `${salesReport.dineInOrders || 0}`],
+        ['Takeaway Orders', `${salesReport.takeawayOrders || 0}`],
+        ['Total Discounts Given', `INR ${salesReport.totalDiscount?.toFixed(2)}`],
+        ['Operational Expenses', `INR ${salesReport.totalExpenses?.toFixed(2)}`]
+      ],
+      headStyles: { fillColor: primaryColor },
+      theme: 'grid'
+    });
+
+    // Payment Section
+    doc.text('2. Revenue Distribution by Payment Mode', 20, doc.lastAutoTable.finalY + 15);
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 20,
+      head: [['Mode', 'Amount (INR)']],
+      body: Object.entries(salesReport.paymentBreakdown || {}).map(([mode, amt]) => [mode, amt.toFixed(2)]),
+      headStyles: { fillColor: primaryColor }
+    });
+
+    // Inventory Section
+    doc.addPage();
+    doc.text('3. Menu Item Performance (Volume & Value)', 20, 25);
+    autoTable(doc, {
+      startY: 30,
+      head: [['Item Name', 'Units Sold', 'Total Revenue (INR)']],
+      body: salesReport.topItems?.map(i => [i.name, i.quantity, i.revenue.toFixed(2)]),
+      headStyles: { fillColor: primaryColor },
+      theme: 'striped'
+    });
+
+    // Footer with Page Numbers
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(`Offline POS System | Confidential | Page ${i} of ${pageCount}`, 105, 290, { align: 'center' });
+    }
+
+    doc.save(`POS_Sales_Report_${dateRange.start}.pdf`);
   };
 
   const addVariation = () => {
@@ -111,6 +253,8 @@ function ManagerPage() {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setShowForm('');
+    setRecipePage(1);
+    setExpensePage(1);
     if (tab === 'menu') loadMenu();
     if (tab === 'stock') loadStock();
     if (tab === 'expenses') loadExpenses();
@@ -118,6 +262,68 @@ function ManagerPage() {
     if (tab === 'users') loadUsers();
     if (tab === 'reports') loadReport();
     if (tab === 'dashboard') loadDashboard();
+    if (tab === 'recipes') loadRecipeCosts();
+  };
+
+  const loadRecipeCosts = async () => {
+    const [costRes, stockRes] = await Promise.all([getAllRecipeCosting(), getStockItems()]);
+    setRecipeCosts(costRes.data);
+    setStockItems(stockRes.data);
+  };
+
+  const handleEditRecipe = (rc) => {
+    setEditingRecipeId(rc.menuItemId);
+    setEditRecipeIngredients(
+      rc.ingredients.map(ing => ({ stockItemId: ing.stockItemId, quantity: ing.quantity, name: ing.name, unit: ing.unit }))
+    );
+  };
+
+  const handleSaveRecipe = async () => {
+    try {
+      const payload = editRecipeIngredients
+        .filter(i => i.stockItemId && i.quantity > 0)
+        .map(i => ({ stockItemId: i.stockItemId, quantity: parseFloat(i.quantity) }));
+      await updateRecipe(editingRecipeId, payload);
+      setEditingRecipeId(null);
+      setEditRecipeIngredients([]);
+      loadRecipeCosts();
+    } catch (err) { alert('Failed to save recipe'); }
+  };
+
+  const handleDeleteRecipeIngredient = async (menuItemId, ingredientId) => {
+    try {
+      await removeRecipeIngredient(menuItemId, ingredientId);
+      loadRecipeCosts();
+    } catch (err) { alert('Failed to remove ingredient'); }
+  };
+
+  const handleDeleteRecipe = async (menuItemId) => {
+    if (!window.confirm('Remove all ingredients from this recipe?')) return;
+    try {
+      await clearRecipe(menuItemId);
+      loadRecipeCosts();
+    } catch (err) { alert('Failed to clear recipe'); }
+  };
+
+  const addEditIngredient = () => {
+    setEditRecipeIngredients([...editRecipeIngredients, { stockItemId: '', quantity: 0 }]);
+  };
+
+  const updateEditIngredient = (index, field, value) => {
+    const updated = [...editRecipeIngredients];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'stockItemId') {
+      const stock = stockItems.find(s => s.id === parseInt(value));
+      if (stock) {
+        updated[index].name = stock.name;
+        updated[index].unit = stock.unit;
+      }
+    }
+    setEditRecipeIngredients(updated);
+  };
+
+  const removeEditIngredient = (index) => {
+    setEditRecipeIngredients(editRecipeIngredients.filter((_, i) => i !== index));
   };
 
   const handleSaveMenuItem = async () => {
@@ -174,17 +380,28 @@ function ManagerPage() {
 
   const handleAddExpense = async () => {
     try {
-      await createExpense({ ...newExpense, amount: parseFloat(newExpense.amount), expenseDate: new Date().toISOString().split('T')[0] });
-      setNewExpense({ category: 'UTILITY', description: '', amount: '', paymentMethod: 'CASH' });
+      await createExpense({
+        ...newExpense,
+        amount: parseFloat(newExpense.amount),
+        gstAmount: parseFloat(newExpense.gstAmount) || 0,
+        supplierId: newExpense.supplierId ? parseInt(newExpense.supplierId) : null,
+        expenseDate: new Date().toISOString().split('T')[0]
+      });
+      setNewExpense({
+        category: 'UTILITY', description: '', amount: '',
+        paymentMethod: 'CASH', gstAmount: '', supplierId: '',
+        isRecurring: false, recurringInterval: 'MONTHLY',
+        receiptImageUrl: ''
+      });
       setShowForm('');
       loadExpenses();
-    } catch (err) { alert('Failed'); }
+    } catch (err) { alert('Failed to save expense'); }
   };
 
   const handleAddStock = async () => {
     try {
       await createStockItem({ ...newStock, reorderLevel: parseFloat(newStock.reorderLevel), costPerUnit: parseFloat(newStock.costPerUnit), active: true });
-      setNewStock({ name: '', unit: 'KG', reorderLevel: '', costPerUnit: '', supplier: '' });
+      setNewStock({ name: '', unit: 'KG', reorderLevel: '', costPerUnit: '', supplierId: '' });
       setShowForm('');
       loadStock();
     } catch (err) { alert('Failed'); }
@@ -192,8 +409,12 @@ function ManagerPage() {
 
   const handleStockTx = async () => {
     try {
-      await recordStockTransaction({ ...stockTx, stockItemId: parseInt(stockTx.stockItemId), quantity: parseFloat(stockTx.quantity) });
-      setStockTx({ stockItemId: '', transactionType: 'PURCHASE', quantity: '', reason: '' });
+      await recordStockTransaction({
+        ...stockTx,
+        stockItemId: parseInt(stockTx.stockItemId),
+        quantity: parseFloat(stockTx.quantity)
+      });
+      setStockTx({ stockItemId: '', transactionType: 'PURCHASE', quantity: '', reason: '', expiryDate: '', wasteCategory: 'SPOILAGE' });
       setShowForm('');
       loadStock();
     } catch (err) { alert('Failed: ' + (err.response?.data?.message || err.message)); }
@@ -271,6 +492,7 @@ function ManagerPage() {
             { id: 'tables', icon: '🪑', label: 'Tables' },
             { id: 'users', icon: '👤', label: 'Users' },
             { id: 'stock', icon: '📦', label: 'Inventory' },
+            { id: 'recipes', icon: '🥘', label: 'Recipes' },
             { id: 'expenses', icon: '💸', label: 'Expenses' },
             { id: 'reports', icon: '📈', label: 'Reports' },
           ].map(tab => (
@@ -295,6 +517,16 @@ function ManagerPage() {
         {/* DASHBOARD */}
         {activeTab === 'dashboard' && dashboard && (
           <div className="m-section animate-fadeIn">
+            {stockAlerts.length > 0 && (
+              <div className="realtime-alerts">
+                {stockAlerts.map((alert, i) => (
+                  <div key={i} className="rt-alert-item animate-slideRight">
+                    <span>🛑 {alert}</span>
+                    <button className="close-alert" onClick={() => setStockAlerts(prev => prev.filter((_, idx) => idx !== i))}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
             <h2>Dashboard</h2>
             <div className="dash-cards">
               <div className="dash-card dc-revenue">
@@ -313,10 +545,19 @@ function ManagerPage() {
                 <div className="dc-label">Today's Expenses</div>
                 <div className="dc-value">₹{dashboard.todayExpenses?.toFixed(0)}</div>
               </div>
+              <div className="dash-card dc-waste" style={{ background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', color: '#721c24' }}>
+                <div className="dc-label">Today's Wastage</div>
+                <div className="dc-value">₹{dashboard.totalWastageValue?.toFixed(0)}</div>
+              </div>
             </div>
 
             {dashboard.lowStockCount > 0 && (
               <div className="alert-banner">⚠️ {dashboard.lowStockCount} items are low on stock!</div>
+            )}
+            {dashboard.expiringItemsCount > 0 && (
+              <div className="alert-banner" style={{ background: '#fff3cd', color: '#856404', borderColor: '#ffeeba' }}>
+                ⏰ {dashboard.expiringItemsCount} items are expiring within a week!
+              </div>
             )}
 
             <div className="dash-grid">
@@ -350,7 +591,7 @@ function ManagerPage() {
 
               <div className="glass-card dash-section">
                 <h3>🕐 Recent Orders</h3>
-                {dashboard.recentOrders?.map(order => (
+                {dashboard.recentOrders?.slice(0, 5).map(order => (
                   <div key={order.id} className="recent-order-row">
                     <span>#{order.id} · {order.tableNumber}</span>
                     <span className={`badge badge-${order.status?.toLowerCase()}`}>{order.status}</span>
@@ -376,26 +617,106 @@ function ManagerPage() {
             </div>
 
 
-            {showCategoryMgr && (
-              <div className="form-card glass-card animate-slideUp" style={{ marginBottom: '20px' }}>
-                <h4>Manage Categories</h4>
-                <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
+            <Modal isOpen={showCategoryMgr} onClose={() => setShowCategoryMgr(false)} title="Manage Categories">
+              <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 150px' }}>
+                <div className="form-group">
+                  <label>Name</label>
                   <input className="input" placeholder="Category Name" value={newCategory.name}
                     onChange={e => setNewCategory({ ...newCategory, name: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
                   <input className="input" placeholder="Description (optional)" value={newCategory.description}
                     onChange={e => setNewCategory({ ...newCategory, description: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>&nbsp;</label>
                   <button className="btn btn-success" onClick={handleAddCategory}>Add Category</button>
                 </div>
-                <div className="category-chips" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {categories.map(c => (
-                    <div key={c.id} className="cat-chip" style={{ background: 'rgba(255,255,255,0.1)', padding: '5px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>{c.name}</span>
-                      <button onClick={() => handleDeleteCategory(c.id)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer' }}>×</button>
+              </div>
+              <div className="category-chips" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {categories.map(c => (
+                  <div key={c.id} className="cat-chip" style={{ background: 'rgba(255,255,255,0.1)', padding: '5px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{c.name}</span>
+                    <button onClick={() => handleDeleteCategory(c.id)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer' }}>&times;</button>
+                  </div>
+                ))}
+              </div>
+            </Modal>
+
+            <Modal isOpen={showForm === 'menu'} onClose={() => { setShowForm(''); setEditingItemId(null); }} title={editingItemId ? "Edit Menu Item" : "Add New Menu Item"}>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Item Name</label>
+                  <input className="input" placeholder="e.g. Chicken Biryani" value={newItem.name}
+                    onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Category</label>
+                  <select className="select" value={newItem.category}
+                    onChange={e => setNewItem({ ...newItem, category: e.target.value })}>
+                    {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="flex justify-between items-center" style={{ marginBottom: '8px' }}>
+                    <span>Pricing / Variations</span>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={addVariation}>+ Add</button>
+                  </label>
+                  {newItem.variations && newItem.variations.length > 0 ? (
+                    <div className="variations-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {newItem.variations.map((v, idx) => (
+                        <div key={idx} className="variation-row" style={{ display: 'flex', gap: '6px' }}>
+                          <input className="input" placeholder="Type" value={v.name} style={{ flex: 1.5 }}
+                            onChange={e => updateVariation(idx, 'name', e.target.value)} />
+                          <input className="input" type="number" placeholder="₹" value={v.price} style={{ flex: 1 }}
+                            onChange={e => updateVariation(idx, 'price', e.target.value)} />
+                          <button type="button" className="btn btn-danger btn-sm" onClick={() => removeVariation(idx)} style={{ padding: '0 8px' }}>×</button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <input className="input" type="number" placeholder="Base Price" value={newItem.price}
+                      onChange={e => setNewItem({ ...newItem, price: e.target.value })} />
+                  )}
+                  <small style={{ color: '#bbb' }}>Leave 0 if using variations</small>
+                </div>
+                <div className="form-group">
+                  <label>Image URL</label>
+                  <input className="input" placeholder="https://..." value={newItem.imageUrl || ''}
+                    onChange={e => setNewItem({ ...newItem, imageUrl: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea className="input" rows="2" placeholder="Item details..." value={newItem.description}
+                    onChange={e => setNewItem({ ...newItem, description: e.target.value })} />
+                </div>
+                <div className="form-group checkbox-group" style={{ flexDirection: 'row', gap: '20px' }}>
+                  <label className="checkbox-label">
+                    <input type="checkbox" checked={newItem.vegetarian}
+                      onChange={e => setNewItem({ ...newItem, vegetarian: e.target.checked })} />
+                    Vegetarian
+                  </label>
+                  <label className="checkbox-label">
+                    <input type="checkbox" checked={newItem.trackStock}
+                      onChange={e => setNewItem({ ...newItem, trackStock: e.target.checked })} />
+                    Track Stock
+                  </label>
+                </div>
+                {newItem.trackStock && (
+                  <div className="form-group animate-slideUp">
+                    <label>Current Stock Level</label>
+                    <input className="input" type="number" value={newItem.stockLevel}
+                      onChange={e => setNewItem({ ...newItem, stockLevel: e.target.value })} />
+                  </div>
+                )}
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <button className="btn btn-success" onClick={handleSaveMenuItem} style={{ width: '100%' }}>
+                    {editingItemId ? 'Update Menu Item' : 'Create Menu Item'}
+                  </button>
                 </div>
               </div>
-            )}
+            </Modal>
 
             <div className="menu-grid-container">
               <div className="menu-management-sidebar">
@@ -425,78 +746,6 @@ function ManagerPage() {
               </div>
 
               <div className="menu-cards-grid">
-                {/* Add New Item Card */}
-                {!editingItemId && (
-                  <div className={`manager-menu-card add-item-card ${showForm === 'menu' ? 'editing-card' : ''} animate-fadeIn`}
-                    onClick={() => !showForm && setShowForm('menu')}>
-                    {showForm === 'menu' ? (
-                      <div className="card-edit-form">
-                        <div className="form-group">
-                          <label>Item Name</label>
-                          <input className="input input-sm" placeholder="e.g. Chicken Biryani" value={newItem.name}
-                            onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
-                        </div>
-                        <div className="form-group variations-section">
-                          <label className="flex justify-between items-center">
-                            Price Variations
-                            <button type="button" className="btn-text btn-sm" onClick={addVariation}>+ Add Variation</button>
-                          </label>
-                          {newItem.variations && newItem.variations.length > 0 ? (
-                            <div className="variations-list">
-                              {newItem.variations.map((v, idx) => (
-                                <div key={idx} className="variation-row animate-fadeIn">
-                                  <input className="input input-sm" placeholder="Variation" value={v.name}
-                                    onChange={e => updateVariation(idx, 'name', e.target.value)} />
-                                  <input className="input input-sm" type="number" placeholder="Price" value={v.price}
-                                    onChange={e => updateVariation(idx, 'price', e.target.value)} />
-                                  <button type="button" className="btn-icon btn-sm text-danger" onClick={() => removeVariation(idx)}>×</button>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="form-group price-field">
-                              <input className="input input-sm" type="number" placeholder="Base Price" value={newItem.price}
-                                onChange={e => setNewItem({ ...newItem, price: e.target.value })} />
-                            </div>
-                          )}
-                        </div>
-                        <div className="form-group">
-                          <label>Category</label>
-                          <select className="select select-sm" value={newItem.category}
-                            onChange={e => setNewItem({ ...newItem, category: e.target.value })}>
-                            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                          </select>
-                        </div>
-                        <div className="form-group">
-                          <label>Image URL</label>
-                          <input className="input input-sm" placeholder="https://example.com/image.jpg" value={newItem.imageUrl || ''}
-                            onChange={e => setNewItem({ ...newItem, imageUrl: e.target.value })} />
-                        </div>
-                        <div className="form-group">
-                          <label>Description</label>
-                          <textarea className="input input-sm" rows="2" placeholder="Item description..." value={newItem.description}
-                            onChange={e => setNewItem({ ...newItem, description: e.target.value })} />
-                        </div>
-                        <div className="form-group checkbox-group">
-                          <label className="checkbox-label">
-                            <input type="checkbox" checked={newItem.vegetarian}
-                              onChange={e => setNewItem({ ...newItem, vegetarian: e.target.checked })} />
-                            Vegetarian
-                          </label>
-                        </div>
-                        <div className="edit-actions">
-                          <button className="btn btn-primary btn-sm" onClick={handleSaveMenuItem}>Create Item</button>
-                          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setShowForm(''); }}>Cancel</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="add-item-content">
-                        <div className="add-icon">+</div>
-                        <span>Add New Menu Item</span>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {menuItems
                   .filter(item => {
@@ -505,118 +754,62 @@ function ManagerPage() {
                     return matchesCategory && matchesSearch;
                   })
                   .map(item => (
-                    editingItemId === item.id ? (
-                      <div key={item.id} className="manager-menu-card editing-card animate-slideUp">
-                        <div className="card-edit-form">
-                          <div className="form-group">
-                            <label>Item Name</label>
-                            <input className="input input-sm" value={newItem.name}
-                              onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
-                          </div>
-                          <div className="form-group variations-section">
-                            <label className="flex justify-between items-center">
-                              Price Variations
-                              <button type="button" className="btn-text btn-sm" onClick={addVariation}>+ Add Variation</button>
-                            </label>
-                            {newItem.variations && newItem.variations.length > 0 ? (
-                              <div className="variations-list">
-                                {newItem.variations.map((v, idx) => (
-                                  <div key={idx} className="variation-row animate-fadeIn">
-                                    <input className="input input-sm" placeholder="Variation (e.g. Small)" value={v.name}
-                                      onChange={e => updateVariation(idx, 'name', e.target.value)} />
-                                    <input className="input input-sm" type="number" placeholder="Price" value={v.price}
-                                      onChange={e => updateVariation(idx, 'price', e.target.value)} />
-                                    <button type="button" className="btn-icon btn-sm text-danger" onClick={() => removeVariation(idx)}>×</button>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="form-group price-field">
-                                <input className="input input-sm" type="number" placeholder="Base Price" value={newItem.price}
-                                  onChange={e => setNewItem({ ...newItem, price: e.target.value })} />
-                                <p className="text-xs text-muted mt-1">Leave price 0 if using variations</p>
-                              </div>
-                            )}
-                          </div>
-                          <div className="form-group">
-                            <label>Image URL</label>
-                            <input className="input input-sm" value={newItem.imageUrl || ''}
-                              onChange={e => setNewItem({ ...newItem, imageUrl: e.target.value })} />
-                          </div>
-                          <div className="form-group">
-                            <label>Description</label>
-                            <textarea className="input input-sm" rows="2" value={newItem.description}
-                              onChange={e => setNewItem({ ...newItem, description: e.target.value })} />
-                          </div>
-                          <div className="form-group checkbox-group">
-                            <label className="checkbox-label">
-                              <input type="checkbox" checked={newItem.vegetarian}
-                                onChange={e => setNewItem({ ...newItem, vegetarian: e.target.checked })} />
-                              Vegetarian
-                            </label>
-                          </div>
-                          <div className="edit-actions">
-                            <button className="btn btn-primary btn-sm" onClick={handleSaveMenuItem}>Save</button>
-                            <button className="btn btn-outline btn-sm" onClick={() => {
-                              setEditingItemId(null);
-                              setNewItem({ name: '', description: '', price: '', category: 'Biryani', imageUrl: '', vegetarian: false, prepTimeMinutes: 15, variations: [] });
-                            }}>Cancel</button>
-                          </div>
+                    <div key={item.id} className={`manager-menu-card ${!item.available ? 'unavailable' : ''} animate-fadeIn`}>
+                      <div className="card-img-wrap">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} />
+                        ) : (
+                          <div className="placeholder-img">🍲</div>
+                        )}
+                        <div className="card-badges">
+                          <span className={`veg-indicator ${item.vegetarian ? 'veg' : 'non-veg'}`}></span>
+                          <span className="category-badge">{item.category}</span>
                         </div>
-                      </div>
-                    ) : (
-                      <div key={item.id} className={`manager-menu-card ${!item.available ? 'unavailable' : ''} animate-fadeIn`}>
-                        <div className="card-img-wrap">
-                          {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} />
-                          ) : (
-                            <div className="placeholder-img">🍲</div>
-                          )}
-                          <div className="card-badges">
-                            <span className={`veg-indicator ${item.vegetarian ? 'veg' : 'non-veg'}`}></span>
-                            <span className="category-badge">{item.category}</span>
-                          </div>
-                          <div className="card-status-overlay">
-                            <span className={`status-pill ${item.available ? 'available' : 'unavailable'}`}>
-                              {item.available ? 'Available' : 'Sold Out'}
+                        <div className="card-status-overlay">
+                          <span className={`status-pill ${item.available ? 'available' : 'unavailable'}`}>
+                            {item.available ? 'Available' : 'Sold Out'}
+                          </span>
+                          {item.trackStock && (
+                            <span className={`status-pill stock-badge ${item.stockLevel < 5 ? 'low-stock' : 'in-stock'}`}>
+                              📦 {item.stockLevel} left
                             </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="card-content">
+                        <div className="card-header">
+                          <h3 className="card-title">{item.name}</h3>
+                          <div className="card-price">
+                            {item.variations && item.variations.length > 0
+                              ? `₹${Math.min(...item.variations.map(v => v.price))}+`
+                              : `₹${item.price}`}
                           </div>
                         </div>
-                        <div className="card-content">
-                          <div className="card-header">
-                            <h3 className="card-title">{item.name}</h3>
-                            <div className="card-price">
-                              {item.variations && item.variations.length > 0
-                                ? `₹${Math.min(...item.variations.map(v => v.price))}+`
-                                : `₹${item.price}`}
-                            </div>
+                        <p className="card-desc">{item.description}</p>
+                        {item.variations && item.variations.length > 0 && (
+                          <div className="variation-chips">
+                            {item.variations.map(v => (
+                              <span key={v.id} className="variation-chip">
+                                {v.name}: ₹{v.price}
+                              </span>
+                            ))}
                           </div>
-                          <p className="card-desc">{item.description}</p>
-                          {item.variations && item.variations.length > 0 && (
-                            <div className="variation-chips">
-                              {item.variations.map(v => (
-                                <span key={v.id} className="variation-chip">
-                                  {v.name}: ₹{v.price}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          <div className="card-actions-wrapper">
-                            <div className="quick-toggle">
-                              <label className="switch">
-                                <input type="checkbox" checked={item.available} onChange={() => handleToggleAvail(item.id)} />
-                                <span className="slider round"></span>
-                              </label>
-                              <span className="toggle-label">{item.available ? 'Active' : 'Hidden'}</span>
-                            </div>
-                            <div className="action-buttons">
-                              <button className="icon-btn" title="Edit Item" onClick={() => handleEditClick(item)}>✏️</button>
-                              <button className="icon-btn delete" title="Delete Item" onClick={() => handleDeleteItem(item.id)}>🗑️</button>
-                            </div>
+                        )}
+                        <div className="card-actions-wrapper">
+                          <div className="quick-toggle">
+                            <label className="switch">
+                              <input type="checkbox" checked={item.available} onChange={() => handleToggleAvail(item.id)} />
+                              <span className="slider round"></span>
+                            </label>
+                            <span className="toggle-label">{item.available ? 'Active' : 'Hidden'}</span>
+                          </div>
+                          <div className="action-buttons">
+                            <button className="icon-btn" title="Edit Item" onClick={() => handleEditClick(item)}>✏️</button>
+                            <button className="icon-btn delete" title="Delete Item" onClick={() => handleDeleteItem(item.id)}>🗑️</button>
                           </div>
                         </div>
                       </div>
-                    )
+                    </div>
                   ))}
                 {menuItems.length === 0 && <div className="empty-state">No menu items found.</div>}
               </div>
@@ -634,18 +827,23 @@ function ManagerPage() {
                 <button className="btn btn-primary" onClick={() => setShowForm(showForm === 'table' ? '' : 'table')}>+ Add Table</button>
               </div>
 
-              {showForm === 'table' && (
-                <div className="form-card glass-card animate-slideUp">
-                  <h4>Add New Table</h4>
-                  <div className="form-grid">
-                    <input className="input" placeholder="Table Number (e.g. T1)" value={newTable.tableNumber}
+              <Modal isOpen={showForm === 'table'} onClose={() => setShowForm('')} title="Add New Table">
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Table Number</label>
+                    <input className="input" placeholder="e.g. T1" value={newTable.tableNumber}
                       onChange={e => setNewTable({ ...newTable, tableNumber: e.target.value })} />
-                    <input className="input" placeholder="Capacity" type="number" value={newTable.capacity}
+                  </div>
+                  <div className="form-group">
+                    <label>Capacity</label>
+                    <input className="input" placeholder="Number of seats" type="number" value={newTable.capacity}
                       onChange={e => setNewTable({ ...newTable, capacity: e.target.value })} />
-                    <button className="btn btn-success" onClick={handleCreateTable}>Create Table</button>
+                  </div>
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <button className="btn btn-success" onClick={handleCreateTable} style={{ width: '100%' }}>Create Table</button>
                   </div>
                 </div>
-              )}
+              </Modal>
               <div className="tables-overview">
                 {tables.map(t => (
                   <div key={t.id} className={`table-overview-card ${t.status?.toLowerCase()}`}>
@@ -668,14 +866,20 @@ function ManagerPage() {
                 <button className="btn btn-primary" onClick={() => setShowForm(showForm === 'user' ? '' : 'user')}>+ Add User</button>
               </div>
 
-              {showForm === 'user' && (
-                <div className="form-card glass-card animate-slideUp">
-                  <h4>Create New User</h4>
-                  <div className="form-grid">
-                    <input className="input" placeholder="Username" value={newUser.username}
+              <Modal isOpen={showForm === 'user'} onClose={() => setShowForm('')} title="Create New User">
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Username</label>
+                    <input className="input" placeholder="Login username" value={newUser.username}
                       onChange={e => setNewUser({ ...newUser, username: e.target.value })} />
-                    <input className="input" placeholder="Display Name" value={newUser.displayName}
+                  </div>
+                  <div className="form-group">
+                    <label>Display Name</label>
+                    <input className="input" placeholder="Full Name" value={newUser.displayName}
                       onChange={e => setNewUser({ ...newUser, displayName: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>System Role</label>
                     <select className="select" value={newUser.role}
                       onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
                       <option value="WAITER">Waiter</option>
@@ -684,13 +888,15 @@ function ManagerPage() {
                       <option value="MANAGER">Manager</option>
                       <option value="ADMIN">Admin</option>
                     </select>
-                    <button className="btn btn-success" onClick={handleCreateUser}>Create Account</button>
                   </div>
-                  <div className="form-hint" style={{ marginTop: '10px' }}>
-                    ℹ️ A secure random password will be generated for the new user.
+                  <div className="form-group" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
+                    <button className="btn btn-success" onClick={handleCreateUser} style={{ width: '100%' }}>Create Account</button>
                   </div>
                 </div>
-              )}
+                <div className="form-hint" style={{ marginTop: '10px' }}>
+                  ℹ️ A secure random password will be generated for the new user.
+                </div>
+              </Modal>
 
               <table className="data-table">
                 <thead>
@@ -738,55 +944,103 @@ function ManagerPage() {
                 <div className="alert-banner">⚠️ Low Stock Alert: {lowStock.map(s => s.name).join(', ')}</div>
               )}
 
-              {showForm === 'stock' && (
-                <div className="form-card glass-card animate-slideUp">
-                  <h4>Add Stock Item</h4>
-                  <div className="form-grid">
-                    <input className="input" placeholder="Item Name" value={newStock.name}
+              <Modal isOpen={showForm === 'stock'} onClose={() => setShowForm('')} title="Add Stock Item">
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Item Name</label>
+                    <input className="input" placeholder="e.g. Chicken" value={newStock.name}
                       onChange={e => setNewStock({ ...newStock, name: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Unit</label>
                     <select className="select" value={newStock.unit}
                       onChange={e => setNewStock({ ...newStock, unit: e.target.value })}>
                       <option>KG</option><option>LITRE</option><option>PIECE</option><option>PACKET</option>
                     </select>
-                    <input className="input" placeholder="Reorder Level" type="number" value={newStock.reorderLevel}
+                  </div>
+                  <div className="form-group">
+                    <label>Reorder Level</label>
+                    <input className="input" placeholder="Alert below this" type="number" value={newStock.reorderLevel}
                       onChange={e => setNewStock({ ...newStock, reorderLevel: e.target.value })} />
-                    <input className="input" placeholder="Cost Per Unit" type="number" value={newStock.costPerUnit}
+                  </div>
+                  <div className="form-group">
+                    <label>Cost Per Unit</label>
+                    <input className="input" placeholder="₹ Amount" type="number" value={newStock.costPerUnit}
                       onChange={e => setNewStock({ ...newStock, costPerUnit: e.target.value })} />
-                    <input className="input" placeholder="Supplier" value={newStock.supplier}
-                      onChange={e => setNewStock({ ...newStock, supplier: e.target.value })} />
-                    <button className="btn btn-success" onClick={handleAddStock}>Save</button>
+                  </div>
+                  <div className="form-group">
+                    <label>Vendor / Supplier</label>
+                    <select className="select" value={newStock.supplierId || ''}
+                      onChange={e => setNewStock({ ...newStock, supplierId: e.target.value })}>
+                      <option value="">Select Supplier</option>
+                      {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
+                    <button className="btn btn-success" onClick={handleAddStock} style={{ width: '100%' }}>Save Item</button>
                   </div>
                 </div>
-              )}
+              </Modal>
 
-              {showForm === 'stocktx' && (
-                <div className="form-card glass-card animate-slideUp">
-                  <h4>Record Stock Transaction</h4>
-                  <div className="form-grid">
+              <Modal isOpen={showForm === 'stocktx'} onClose={() => setShowForm('')} title="Record Stock Transaction">
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Stock Item</label>
                     <select className="select" value={stockTx.stockItemId}
                       onChange={e => setStockTx({ ...stockTx, stockItemId: e.target.value })}>
                       <option value="">Select Item</option>
                       {stockItems.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Transaction Type</label>
                     <select className="select" value={stockTx.transactionType}
                       onChange={e => setStockTx({ ...stockTx, transactionType: e.target.value })}>
                       <option value="PURCHASE">Purchase (Add Stock)</option>
                       <option value="ISSUE_TO_KITCHEN">Issue to Kitchen</option>
                       <option value="WASTE">Waste / Expired</option>
-                      <option value="ADJUSTMENT">Manual Adjustment</option>
+                      <option value="ADJUSTMENT">Stock Take (Audit)</option>
                     </select>
-                    <input className="input" placeholder="Quantity" type="number" value={stockTx.quantity}
+                  </div>
+                  <div className="form-group">
+                    <label>{stockTx.transactionType === 'ADJUSTMENT' ? "Physical Count Found" : "Quantity"}</label>
+                    <input className="input" placeholder="Enter amount" type="number" value={stockTx.quantity}
                       onChange={e => setStockTx({ ...stockTx, quantity: e.target.value })} />
-                    <input className="input" placeholder="Reason / Notes" value={stockTx.reason}
+                    <small style={{ color: '#bbb', fontSize: '0.7rem' }}>{stockTx.transactionType === 'ADJUSTMENT' ? "Entering count will override system stock" : ""}</small>
+                  </div>
+                  {stockTx.transactionType === 'PURCHASE' && (
+                    <div className="form-group">
+                      <label>Expiry Date</label>
+                      <input className="input" type="date" value={stockTx.expiryDate || ''}
+                        onChange={e => setStockTx({ ...stockTx, expiryDate: e.target.value })} />
+                    </div>
+                  )}
+                  {stockTx.transactionType === 'WASTE' && (
+                    <div className="form-group">
+                      <label>Waste Category</label>
+                      <select className="select" value={stockTx.wasteCategory || 'SPOILAGE'}
+                        onChange={e => setStockTx({ ...stockTx, wasteCategory: e.target.value })}>
+                        <option value="SPOILAGE">Spoilage (Rotten/Expired)</option>
+                        <option value="PREP_ERROR">Prep Error (Burnt/Spilled)</option>
+                        <option value="DAMAGED">Damaged (Broken Packaging)</option>
+                        <option value="CUSTOMER_RETURN">Customer Return</option>
+                      </select>
+                    </div>
+                  )}
+                  <div className="form-group">
+                    <label>Reason / Notes</label>
+                    <input className="input" placeholder="Any comments..." value={stockTx.reason}
                       onChange={e => setStockTx({ ...stockTx, reason: e.target.value })} />
-                    <button className="btn btn-success" onClick={handleStockTx}>Record</button>
+                  </div>
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <button className="btn btn-success" onClick={handleStockTx} style={{ width: '100%' }}>Record Transaction</button>
                   </div>
                 </div>
-              )}
+              </Modal>
 
               <table className="data-table">
                 <thead>
-                  <tr><th>Name</th><th>Unit</th><th>Current Stock</th><th>Reorder Level</th><th>Cost/Unit</th><th>Supplier</th><th>Status</th></tr>
+                  <tr><th>Name</th><th>Unit</th><th>Current Stock</th><th>Last Audit</th><th>Cost/Unit</th><th>Supplier</th><th>Status</th></tr>
                 </thead>
                 <tbody>
                   {stockItems.map(s => (
@@ -794,7 +1048,7 @@ function ManagerPage() {
                       <td className="name-cell">{s.name}</td>
                       <td>{s.unit}</td>
                       <td className="amount-cell">{s.currentStock}</td>
-                      <td>{s.reorderLevel}</td>
+                      <td>{s.lastAuditDate ? new Date(s.lastAuditDate).toLocaleDateString() : 'Never'}</td>
                       <td>₹{s.costPerUnit}</td>
                       <td>{s.supplier || '—'}</td>
                       <td>
@@ -825,6 +1079,30 @@ function ManagerPage() {
                   </table>
                 </>
               )}
+
+              {expiringStock.length > 0 && (
+                <div style={{ marginTop: '32px' }}>
+                  <h3>⚠️ Expiring Soon (Next 7 Days)</h3>
+                  <table className="data-table">
+                    <thead><tr><th>Item</th><th>Qty</th><th>Expiry Date</th><th>Action</th></tr></thead>
+                    <tbody>
+                      {expiringStock.map(ex => (
+                        <tr key={ex.id} className="row-warning">
+                          <td>{ex.stockItem?.name}</td>
+                          <td>{ex.quantity}</td>
+                          <td>{ex.expiryDate}</td>
+                          <td>
+                            <button className="btn btn-sm btn-outline" onClick={() => {
+                              setStockTx({ stockItemId: ex.stockItem.id, transactionType: 'WASTE', quantity: ex.quantity, reason: 'Expired', wasteCategory: 'SPOILAGE' });
+                              setShowForm('stocktx');
+                            }}>Mark as Waste</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )
         }
@@ -835,47 +1113,170 @@ function ManagerPage() {
             <div className="m-section animate-fadeIn">
               <div className="section-header">
                 <h2>Expense Management</h2>
-                <button className="btn btn-primary" onClick={() => setShowForm(showForm === 'expense' ? '' : 'expense')}>+ Add Expense</button>
+                <div className="header-actions">
+                  <div className="flex items-center gap-10">
+                    <div className="search-box">
+                      <input
+                        type="text"
+                        placeholder="Search expenses..."
+                        value={expenseSearch}
+                        onChange={(e) => { setExpenseSearch(e.target.value); setExpensePage(1); }}
+                        className="input input-sm"
+                        style={{ width: '200px' }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '0.8rem', color: '#bbb' }}>Vendor:</span>
+                    <select className="select select-sm" value={selectedSupplier}
+                      onChange={e => {
+                        const sid = e.target.value;
+                        setSelectedSupplier(sid);
+                        loadExpenses(sid);
+                        setExpensePage(1);
+                      }}>
+                      <option value="">Today's All</option>
+                      {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <button className="btn btn-primary" onClick={() => setShowForm(showForm === 'expense' ? '' : 'expense')}>+ Add Expense</button>
+                </div>
               </div>
 
-              {showForm === 'expense' && (
-                <div className="form-card glass-card animate-slideUp">
-                  <div className="form-grid">
+              <Modal isOpen={showForm === 'expense'} onClose={() => setShowForm('')} title="Add New Expense">
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Category</label>
                     <select className="select" value={newExpense.category}
                       onChange={e => setNewExpense({ ...newExpense, category: e.target.value })}>
                       <option>UTILITY</option><option>SALARY</option><option>SUPPLIES</option>
                       <option>RENT</option><option>MAINTENANCE</option><option>OTHER</option>
                     </select>
-                    <input className="input" placeholder="Description" value={newExpense.description}
+                  </div>
+                  <div className="form-group">
+                    <label>Description</label>
+                    <input className="input" placeholder="e.g. Electricity Bill" value={newExpense.description}
                       onChange={e => setNewExpense({ ...newExpense, description: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Amount (Total)</label>
                     <input className="input" placeholder="Amount" type="number" value={newExpense.amount}
                       onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>GST Amount (Paid)</label>
+                    <input className="input" placeholder="GST Amount" type="number" value={newExpense.gstAmount || ''}
+                      onChange={e => setNewExpense({ ...newExpense, gstAmount: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Payment Mode</label>
                     <select className="select" value={newExpense.paymentMethod}
                       onChange={e => setNewExpense({ ...newExpense, paymentMethod: e.target.value })}>
                       <option>CASH</option><option>UPI</option><option>BANK_TRANSFER</option>
                     </select>
-                    <button className="btn btn-success" onClick={handleAddExpense}>Save</button>
+                  </div>
+                  <div className="form-group">
+                    <label>Receipt Image URL</label>
+                    <input className="input" placeholder="https://..." value={newExpense.receiptImageUrl || ''}
+                      onChange={e => setNewExpense({ ...newExpense, receiptImageUrl: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Supplier (Optional)</label>
+                    <select className="select" value={newExpense.supplierId || ''}
+                      onChange={e => setNewExpense({ ...newExpense, supplierId: e.target.value })}>
+                      <option value="">None / Manual</option>
+                      {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Recurring</label>
+                    <div className="flex items-center gap-10">
+                      <label className="checkbox-label">
+                        <input type="checkbox" checked={newExpense.isRecurring}
+                          onChange={e => setNewExpense({ ...newExpense, isRecurring: e.target.checked })} />
+                        Yes
+                      </label>
+                      {newExpense.isRecurring && (
+                        <select className="select select-sm" value={newExpense.recurringInterval}
+                          onChange={e => setNewExpense({ ...newExpense, recurringInterval: e.target.value })}>
+                          <option value="MONTHLY">Monthly</option>
+                          <option value="WEEKLY">Weekly</option>
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <button className="btn btn-success" onClick={handleAddExpense} style={{ width: '100%' }}>Save Expense</button>
                   </div>
                 </div>
-              )}
+              </Modal>
 
               <table className="data-table">
                 <thead>
-                  <tr><th>Category</th><th>Description</th><th>Amount</th><th>Payment</th><th>Date</th><th>Action</th></tr>
+                  <tr><th>Category</th><th>Description</th><th>Amount</th><th>GST</th><th>Mode</th><th>Recurring</th><th>Date</th><th>Action</th></tr>
                 </thead>
                 <tbody>
-                  {expenses.map(exp => (
-                    <tr key={exp.id}>
-                      <td><span className="type-tag">{exp.category}</span></td>
-                      <td>{exp.description}</td>
-                      <td className="amount-cell">₹{exp.amount}</td>
-                      <td>{exp.paymentMethod}</td>
-                      <td>{exp.expenseDate}</td>
-                      <td>
-                        <button className="btn btn-sm btn-danger" onClick={async () => { await deleteExpense(exp.id); loadExpenses(); }}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {(() => {
+                    const filtered = expenses.filter(exp =>
+                      (exp.description || '').toLowerCase().includes(expenseSearch.toLowerCase()) ||
+                      (exp.category || '').toLowerCase().includes(expenseSearch.toLowerCase()) ||
+                      (exp.paymentMethod || '').toLowerCase().includes(expenseSearch.toLowerCase())
+                    );
+                    const totalPages = Math.ceil(filtered.length / EXPENSES_PER_PAGE);
+                    const displayData = filtered.slice((expensePage - 1) * EXPENSES_PER_PAGE, expensePage * EXPENSES_PER_PAGE);
+
+                    if (filtered.length === 0) {
+                      return <tr><td colSpan="8" className="empty-state-sm">No expenses found.</td></tr>;
+                    }
+
+                    return (
+                      <>
+                        {displayData.map(exp => (
+                          <tr key={exp.id}>
+                            <td className="name-cell"><span className="badge badge-prep">{exp.category}</span></td>
+                            <td>{exp.description}</td>
+                            <td style={{ fontWeight: 700 }}>₹{exp.amount.toFixed(2)}</td>
+                            <td style={{ color: '#bbb' }}>₹{(exp.gstAmount || 0).toFixed(2)}</td>
+                            <td><span className="badge badge-ready">{exp.paymentMethod}</span></td>
+                            <td>{exp.isRecurring ? `Periodic (${exp.recurringInterval})` : 'One-time'}</td>
+                            <td style={{ fontSize: '0.8rem' }}>{new Date(exp.expenseDate).toLocaleDateString()}</td>
+                            <td>
+                              <button className="icon-btn delete" onClick={() => handleDeleteExpense(exp.id)}>🗑️</button>
+                            </td>
+                          </tr>
+                        ))}
+                        {totalPages > 1 && (
+                          <tr className="pagination-row">
+                            <td colSpan="8">
+                              <div className="pagination">
+                                <button
+                                  className="btn-icon"
+                                  disabled={expensePage === 1}
+                                  onClick={() => setExpensePage(p => p - 1)}
+                                >
+                                  ‹
+                                </button>
+                                {[...Array(totalPages)].map((_, i) => (
+                                  <button
+                                    key={i}
+                                    className={`page-num ${expensePage === i + 1 ? 'active' : ''}`}
+                                    onClick={() => setExpensePage(i + 1)}
+                                  >
+                                    {i + 1}
+                                  </button>
+                                ))}
+                                <button
+                                  className="btn-icon"
+                                  disabled={expensePage === totalPages}
+                                  onClick={() => setExpensePage(p => p + 1)}
+                                >
+                                  ›
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -894,22 +1295,244 @@ function ManagerPage() {
                   <span>to</span>
                   <input type="date" className="input" value={dateRange.end}
                     onChange={e => setDateRange({ ...dateRange, end: e.target.value })} />
-                  <button className="btn btn-primary" onClick={loadReport}>Generate</button>
+                  {salesReport && (
+                    <button className="btn btn-outline" onClick={downloadReportPDF}>📥 Export PDF</button>
+                  )}
                 </div>
               </div>
 
               {salesReport && (
-                <div className="report-results">
-                  <div className="report-cards">
-                    {Object.entries(salesReport).map(([key, val]) => (
-                      <div key={key} className="report-card glass-card">
-                        <div className="rc-label">{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}</div>
-                        <div className="rc-value">{typeof val === 'number' ? (key.includes('Revenue') || key.includes('Gst') || key.includes('Discount') || key.includes('Expenses') || key.includes('Profit') ? `₹${val.toFixed(2)}` : val) : val}</div>
+                <div className="report-results animate-fadeIn">
+                  {/* Summary Metric Grid */}
+                  <div className="report-metrics-grid">
+                    <div className="metric-card">
+                      <div className="metric-label">Total Revenue</div>
+                      <div className="metric-value">₹{salesReport.totalRevenue?.toFixed(2)}</div>
+                    </div>
+                    <div className="metric-card">
+                      <div className="metric-label">Net Profit</div>
+                      <div className="metric-value text-success">₹{salesReport.netProfit?.toFixed(2)}</div>
+                    </div>
+                    <div className="metric-card">
+                      <div className="metric-label">Total Gst</div>
+                      <div className="metric-value">₹{salesReport.totalGst?.toFixed(2)}</div>
+                    </div>
+                    <div className="metric-card">
+                      <div className="metric-label">Total Orders</div>
+                      <div className="metric-value">{salesReport.totalOrders}</div>
+                    </div>
+                  </div>
+
+                  <div className="report-detail-columns">
+                    {/* Left: Stats Table */}
+                    <div className="report-detail-sec glass-card">
+                      <h3>📊 General Stats</h3>
+                      <div className="stat-lines">
+                        <div className="stat-line"><span>Paid Orders:</span> <b>{salesReport.paidOrders}</b></div>
+                        <div className="stat-line"><span>Cancelled Orders:</span> <b className="text-danger">{salesReport.cancelledOrders}</b></div>
+                        <div className="stat-line"><span>Dine-In:</span> <b>{salesReport.dineInOrders}</b></div>
+                        <div className="stat-line"><span>Takeaway:</span> <b>{salesReport.takeawayOrders}</b></div>
+                        <div className="stat-line"><span>Total Discount:</span> <b>₹{salesReport.totalDiscount?.toFixed(2)}</b></div>
+                        <div className="stat-line"><span>Total Expenses:</span> <b className="text-danger">₹{salesReport.totalExpenses?.toFixed(2)}</b></div>
                       </div>
-                    ))}
+
+                      <h3 style={{ marginTop: '24px' }}>💳 Payment Modes</h3>
+                      <div className="payment-pills">
+                        {Object.entries(salesReport.paymentBreakdown || {}).map(([mode, amt]) => (
+                          <div key={mode} className="payment-pill">
+                            <span className="pill-mode">{mode}</span>
+                            <span className="pill-amt">₹{amt.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Right: Top Items */}
+                    <div className="report-detail-sec glass-card">
+                      <h3>🔥 Top Selling Items</h3>
+                      <table className="data-table mt-0">
+                        <thead><tr><th>Item</th><th>Qty</th><th>Revenue</th></tr></thead>
+                        <tbody>
+                          {salesReport.topItems?.map((item, idx) => (
+                            <tr key={idx}>
+                              <td>{item.name}</td>
+                              <td>{item.quantity}</td>
+                              <td className="amount-cell">₹{item.revenue.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}
+            </div>
+          )
+        }
+
+        {/* RECIPES */}
+        {
+          activeTab === 'recipes' && (
+            <div className="m-section animate-fadeIn">
+              <div className="section-header">
+                <h2>Recipe Costing & Profit Margins</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <div className="search-box">
+                    <input
+                      type="text"
+                      placeholder="Search recipes..."
+                      value={recipeSearch}
+                      onChange={(e) => { setRecipeSearch(e.target.value); setRecipePage(1); }}
+                      className="input input-sm"
+                      style={{ width: '250px' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="recipes-grid">
+                <table className="data-table recipe-table">
+                  <thead>
+                    <tr>
+                      <th>Menu Item</th>
+                      <th>Selling Price</th>
+                      <th>Recipe Cost</th>
+                      <th>Profit</th>
+                      <th>Margin %</th>
+                      <th>Complexity</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const filtered = recipeCosts.filter(rc =>
+                        rc.menuItemName.toLowerCase().includes(recipeSearch.toLowerCase())
+                      );
+                      const totalPages = Math.ceil(filtered.length / RECIPES_PER_PAGE);
+                      const displayData = filtered.slice((recipePage - 1) * RECIPES_PER_PAGE, recipePage * RECIPES_PER_PAGE);
+
+                      if (filtered.length === 0) {
+                        return <tr><td colSpan="7" className="empty-state-sm">No recipes found.</td></tr>;
+                      }
+
+                      return (
+                        <>
+                          {displayData.map(rc => (
+                            <React.Fragment key={rc.menuItemId}>
+                              <tr className="recipe-row">
+                                <td className="name-cell">{rc.menuItemName}</td>
+                                <td>₹{rc.sellingPrice}</td>
+                                <td>₹{rc.estimatedCost.toFixed(2)}</td>
+                                <td style={{ color: rc.profitAmount > 0 ? '#10b981' : '#ef4444', fontWeight: 700 }}>₹{rc.profitAmount.toFixed(2)}</td>
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '60px', height: '8px', background: 'var(--bg-input)', borderRadius: '4px', overflow: 'hidden' }}>
+                                      <div style={{ width: `${Math.min(100, Math.max(0, rc.marginPercentage))}%`, height: '100%', background: rc.marginPercentage > 30 ? '#10b981' : rc.marginPercentage > 15 ? '#f59e0b' : '#ef4444', transition: 'width 0.5s ease' }}></div>
+                                    </div>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{rc.marginPercentage.toFixed(1)}%</span>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div className="recipe-complexity-cell">
+                                    <span className={`badge ${rc.ingredients.length > 5 ? 'badge-new' : 'badge-ready'}`}>
+                                      {rc.ingredients.length} Ingredients
+                                    </span>
+                                    {rc.ingredients.length > 0 && (
+                                      <div className="recipe-tooltip">
+                                        <div className="recipe-tooltip-title">📦 Ingredients Breakdown</div>
+                                        {rc.ingredients.map((ing, i) => (
+                                          <div key={i} className="recipe-tooltip-row">
+                                            <span className="recipe-tooltip-name">{ing.name}</span>
+                                            <span className="recipe-tooltip-detail">{ing.quantity}{ing.unit} (₹{ing.lineCost.toFixed(1)})</span>
+                                          </div>
+                                        ))}
+                                        <div className="recipe-tooltip-total">
+                                          <span>Total Cost</span>
+                                          <span>₹{rc.estimatedCost.toFixed(2)}</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td>
+                                  <div className="recipe-actions">
+                                    <button className="icon-btn" title="Edit Recipe" onClick={() => handleEditRecipe(rc)}>✏️</button>
+                                    <button className="icon-btn delete" title="Delete Recipe" onClick={() => handleDeleteRecipe(rc.menuItemId)}>🗑️</button>
+                                  </div>
+                                </td>
+                              </tr>
+                              {editingRecipeId === rc.menuItemId && (
+                                <tr className="recipe-edit-row animate-slideUp">
+                                  <td colSpan="7">
+                                    <div className="recipe-edit-panel glass-card">
+                                      <div className="recipe-edit-header">
+                                        <h4>✏️ Edit Recipe — {rc.menuItemName}</h4>
+                                        <button className="btn-text btn-sm" onClick={addEditIngredient}>+ Add Ingredient</button>
+                                      </div>
+                                      <div className="recipe-edit-ingredients">
+                                        {editRecipeIngredients.map((ing, idx) => (
+                                          <div key={idx} className="recipe-edit-ingredient-row animate-fadeIn">
+                                            <select className="select select-sm" value={ing.stockItemId}
+                                              onChange={e => updateEditIngredient(idx, 'stockItemId', e.target.value)}>
+                                              <option value="">Select Stock Item</option>
+                                              {stockItems.map(s => <option key={s.id} value={s.id}>{s.name} ({s.unit})</option>)}
+                                            </select>
+                                            <input className="input input-sm" type="number" step="0.01" placeholder="Qty"
+                                              value={ing.quantity} onChange={e => updateEditIngredient(idx, 'quantity', e.target.value)} />
+                                            <button className="btn-icon btn-sm text-danger" onClick={() => removeEditIngredient(idx)}>×</button>
+                                          </div>
+                                        ))}
+                                        {editRecipeIngredients.length === 0 && (
+                                          <div className="empty-state-sm">No ingredients. Click "+ Add Ingredient" to start.</div>
+                                        )}
+                                      </div>
+                                      <div className="recipe-edit-actions">
+                                        <button className="btn btn-primary btn-sm" onClick={handleSaveRecipe}>💾 Save Recipe</button>
+                                        <button className="btn btn-outline btn-sm" onClick={() => { setEditingRecipeId(null); setEditRecipeIngredients([]); }}>Cancel</button>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          ))}
+                          {totalPages > 1 && (
+                            <tr className="pagination-row">
+                              <td colSpan="7">
+                                <div className="pagination">
+                                  <button
+                                    className="btn-icon"
+                                    disabled={recipePage === 1}
+                                    onClick={() => setRecipePage(p => p - 1)}
+                                  >
+                                    ‹
+                                  </button>
+                                  {[...Array(totalPages)].map((_, i) => (
+                                    <button
+                                      key={i}
+                                      className={`page-num ${recipePage === i + 1 ? 'active' : ''}`}
+                                      onClick={() => setRecipePage(i + 1)}
+                                    >
+                                      {i + 1}
+                                    </button>
+                                  ))}
+                                  <button
+                                    className="btn-icon"
+                                    disabled={recipePage === totalPages}
+                                    onClick={() => setRecipePage(p => p + 1)}
+                                  >
+                                    ›
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )
         }

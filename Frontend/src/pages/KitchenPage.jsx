@@ -168,9 +168,12 @@ function KitchenPage() {
                 </div>
                 <div className="kds-items">
                   {order.items?.map(item => (
-                    <div key={item.id} className="kds-item">
+                    <div key={item.id} className={`kds-item ${item.status === 'SERVED' || item.status === 'READY' ? 'item-done' : ''}`}>
                       <span className="kds-qty">{item.quantity}x</span>
-                      <span className="kds-item-name">{item.menuItem?.name || 'Unknown'}</span>
+                      <span className="kds-item-name">
+                        {item.menuItem?.name || 'Unknown'}
+                        {item.status && item.status !== 'NEW' && <span className={`kds-item-status status-${item.status.toLowerCase()}`}>{item.status}</span>}
+                      </span>
                     </div>
                   ))}
                 </div>

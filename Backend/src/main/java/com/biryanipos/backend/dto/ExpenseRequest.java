@@ -11,5 +11,10 @@ public class ExpenseRequest {
   private String supplierName;
   private String paymentMethod;
   private LocalDate expenseDate;
+  private Long supplierId;
+  private double gstAmount;
+  private boolean isRecurring;
+  private String recurringInterval;
+  private String receiptImageUrl;
   private String notes;
 }

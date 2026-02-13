@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getOrders, getActiveOrders, processPayment, getBill, updateOrderStatus } from '../service/api';
 import { connectWebSocket } from '../service/ws';
 import { useAuth } from '../context/AuthContext';
+import ThermalReceipt from '../components/ThermalReceipt';
 import './CounterPage.css';
 
 function CounterPage() {
@@ -15,33 +16,43 @@ function CounterPage() {
   const [paymentMode, setPaymentMode] = useState('CASH');
   const [amountReceived, setAmountReceived] = useState('');
   const [discount, setDiscount] = useState('');
+  const [isMultiPay, setIsMultiPay] = useState(false);
+  const [addedPayments, setAddedPayments] = useState([]); // { mode: 'CASH', amount: 500 }
   const [loading, setLoading] = useState(false);
+
+  const [stockAlerts, setStockAlerts] = useState([]);
 
   useEffect(() => {
     loadOrders();
-    const stompClient = connectWebSocket((order) => {
-      setOrders(prev => {
-        const idx = prev.findIndex(o => o.id === order.id);
-        if (order.status === 'PAID' || order.status === 'CANCELLED') {
-          return prev.filter(o => o.id !== order.id);
-        }
-        if (idx !== -1) {
-          const updated = [...prev];
-          updated[idx] = order;
-          return updated;
-        }
-        return [...prev, order];
-      });
-
-      // Update history state for PAID orders
-      if (order.status === 'PAID') {
-        setAllOrders(prev => {
-          const exists = prev.find(o => o.id === order.id);
-          if (exists) return prev.map(o => o.id === order.id ? order : o);
-          return [order, ...prev];
+    const stompClient = connectWebSocket(
+      (order) => {
+        setOrders(prev => {
+          const idx = prev.findIndex(o => o.id === order.id);
+          if (order.status === 'PAID' || order.status === 'CANCELLED') {
+            return prev.filter(o => o.id !== order.id);
+          }
+          if (idx !== -1) {
+            const updated = [...prev];
+            updated[idx] = order;
+            return updated;
+          }
+          return [...prev, order];
         });
+
+        // Update history state for PAID orders
+        if (order.status === 'PAID') {
+          setAllOrders(prev => {
+            const exists = prev.find(o => o.id === order.id);
+            if (exists) return prev.map(o => o.id === order.id ? order : o);
+            return [order, ...prev];
+          });
+        }
+      },
+      null, // No table updates for counter
+      (alert) => {
+        setStockAlerts(prev => [alert, ...prev].slice(0, 3));
       }
-    });
+    );
     return () => { if (stompClient) stompClient.deactivate(); };
   }, []);
 
@@ -59,8 +70,12 @@ function CounterPage() {
       const res = await getBill(order.id);
       setBillData(res.data);
       setView('bill');
+      setView('bill');
       setDiscount('');
       setAmountReceived('');
+      setIsMultiPay(false);
+      setAddedPayments([]);
+      setPaymentMode('CASH');
     } catch (err) { console.error(err); }
   };
 
@@ -68,13 +83,25 @@ function CounterPage() {
     if (!selectedOrder) return;
     setLoading(true);
     try {
-      await processPayment({
+      const payload = {
         orderId: selectedOrder.id,
-        paymentMode,
         discount: parseFloat(discount) || 0,
-        amountReceived: parseFloat(amountReceived) || 0,
         transactionRef: ''
-      });
+      };
+
+      if (isMultiPay) {
+        payload.paymentModes = addedPayments;
+        payload.amountReceived = addedPayments.reduce((sum, p) => sum + p.amount, 0); // Total paid
+      } else {
+        payload.paymentMode = paymentMode;
+        payload.amountReceived = parseFloat(amountReceived) || 0;
+      }
+
+      await processPayment(payload);
+
+      // Auto-trigger print if needed, or just show success
+      // window.print(); // We can trigger here
+
       alert('✅ Payment processed!');
       setSelectedOrder(null);
       setBillData(null);
@@ -84,6 +111,10 @@ function CounterPage() {
       alert('❌ Payment failed: ' + (err.response?.data?.message || err.message));
     }
     setLoading(false);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   const calculateBill = () => {
@@ -107,7 +138,12 @@ function CounterPage() {
     const total = sub + cgst + sgst;
     const received = parseFloat(amountReceived) || 0;
     const change = received > total ? received - total : 0;
-    return { sub, cgst, sgst, total, change };
+
+    // For MultiPay
+    const totalPaidSoFar = addedPayments.reduce((sum, p) => sum + p.amount, 0);
+    const multiPayRemaining = Math.max(0, total - totalPaidSoFar);
+
+    return { sub, cgst, sgst, total, change, multiPayRemaining, totalPaidSoFar };
   };
 
   const calc = calculateBill();
@@ -119,6 +155,16 @@ function CounterPage() {
 
   return (
     <div className="counter-page">
+      {stockAlerts.length > 0 && (
+        <div className="counter-alerts">
+          {stockAlerts.map((alert, i) => (
+            <div key={i} className="counter-alert-item animate-slideRight">
+              <span>🛑 {alert}</span>
+              <button className="close-alert" onClick={() => setStockAlerts(prev => prev.filter((_, idx) => idx !== i))}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
       <header className="counter-header">
         <div className="counter-header-left">
           <Link to="/" className="back-btn">←</Link>
@@ -186,7 +232,12 @@ function CounterPage() {
               {/* Bill Preview */}
               <div className="bill-preview glass-card">
                 <div className="bill-header-sec">
-                  <h2>🧾 Invoice</h2>
+                  <div className="flex-between">
+                    <h2>🧾 Invoice</h2>
+                    <button className="btn btn-outline btn-sm print-btn-ui" onClick={handlePrint}>
+                      🖨️ Print
+                    </button>
+                  </div>
                   <div className="bill-meta">
                     <div>Order #{billData.orderId}</div>
                     <div>Table: {billData.tableNumber}</div>
@@ -228,41 +279,90 @@ function CounterPage() {
 
               {/* Payment Panel */}
               <div className="payment-panel glass-card">
-                <h3>Payment</h3>
-
-                <div className="payment-modes">
-                  {['CASH', 'CARD', 'UPI'].map(mode => (
-                    <button key={mode}
-                      className={`payment-mode-btn ${paymentMode === mode ? 'active' : ''}`}
-                      onClick={() => setPaymentMode(mode)}>
-                      {mode === 'CASH' ? '💵' : mode === 'CARD' ? '💳' : '📱'} {mode}
-                    </button>
-                  ))}
+                <div className="flex-between">
+                  <h3>Payment</h3>
+                  <button className="btn btn-xs btn-outline" onClick={() => { setIsMultiPay(!isMultiPay); setAddedPayments([]); }}>
+                    {isMultiPay ? 'Switch to Single Mode' : 'Enable Split Payment'}
+                  </button>
                 </div>
 
-                <div className="payment-fields">
-                  <label>Discount (₹)</label>
-                  <input className="input" type="number" placeholder="0" value={discount}
-                    onChange={e => setDiscount(e.target.value)} />
+                {!isMultiPay ? (
+                  <>
+                    <div className="payment-modes">
+                      {['CASH', 'CARD', 'UPI'].map(mode => (
+                        <button key={mode}
+                          className={`payment-mode-btn ${paymentMode === mode ? 'active' : ''}`}
+                          onClick={() => setPaymentMode(mode)}>
+                          {mode === 'CASH' ? '💵' : mode === 'CARD' ? '💳' : '📱'} {mode}
+                        </button>
+                      ))}
+                    </div>
 
-                  {paymentMode === 'CASH' && (
-                    <>
-                      <label>Amount Received (₹)</label>
-                      <input className="input" type="number" placeholder="0" value={amountReceived}
-                        onChange={e => setAmountReceived(e.target.value)} />
-                      {calc.change > 0 && (
-                        <div className="change-display">Change: ₹{calc.change.toFixed(2)}</div>
+                    <div className="payment-fields">
+                      <label>Discount (₹)</label>
+                      <input className="input" type="number" placeholder="0" value={discount}
+                        onChange={e => setDiscount(e.target.value)} />
+
+                      {paymentMode === 'CASH' && (
+                        <>
+                          <label>Amount Received (₹)</label>
+                          <input className="input" type="number" placeholder="0" value={amountReceived}
+                            onChange={e => setAmountReceived(e.target.value)} />
+                          {calc.change > 0 && (
+                            <div className="change-display">Change: ₹{calc.change.toFixed(2)}</div>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="multi-pay-section animate-fadeIn">
+                    <label>Discount (₹)</label>
+                    <input className="input" type="number" placeholder="0" value={discount}
+                      onChange={e => setDiscount(e.target.value)} />
+
+                    <div className="payment-summary-box">
+                      <div>Total Due: <strong>₹{calc.total.toFixed(2)}</strong></div>
+                      <div style={{ color: calc.multiPayRemaining > 0 ? '#EF4444' : '#10B981' }}>
+                        Remaining: <strong>₹{calc.multiPayRemaining.toFixed(2)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="add-payment-row">
+                      <select className="input" value={paymentMode} onChange={e => setPaymentMode(e.target.value)}>
+                        <option value="CASH">Cash</option>
+                        <option value="UPI">UPI</option>
+                        <option value="CARD">Card</option>
+                      </select>
+                      <input className="input" type="number" placeholder="Amount"
+                        value={amountReceived} onChange={e => setAmountReceived(e.target.value)} />
+                      <button className="btn btn-sm btn-primary" onClick={() => {
+                        if (!amountReceived || parseFloat(amountReceived) <= 0) return;
+                        const amt = parseFloat(amountReceived);
+                        setAddedPayments([...addedPayments, { mode: paymentMode, amount: amt }]);
+                        setAmountReceived('');
+                      }} disabled={!amountReceived}>Add</button>
+                    </div>
+
+                    <div className="added-payments-list">
+                      {addedPayments.map((p, i) => (
+                        <div key={i} className="added-payment-item">
+                          <span>{p.mode}</span>
+                          <span>₹{p.amount}</span>
+                          <button className="delete-btn" onClick={() => setAddedPayments(addedPayments.filter((_, idx) => idx !== i))}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="payment-actions">
                   <button className="btn btn-outline" onClick={() => { setView('pending'); setSelectedOrder(null); }}>
                     Cancel
                   </button>
-                  <button className="btn btn-success btn-lg" onClick={handlePayment} disabled={loading}>
-                    {loading ? '⏳ Processing...' : `✅ Pay ₹${calc.total?.toFixed(2)}`}
+                  <button className="btn btn-success btn-lg" onClick={handlePayment}
+                    disabled={loading || (isMultiPay && calc.multiPayRemaining > 0)}>
+                    {loading ? '⏳ Processing...' : (isMultiPay ? '✅ Settle Bill' : `✅ Pay ₹${calc.total?.toFixed(2)}`)}
                   </button>
                 </div>
               </div>
@@ -278,7 +378,7 @@ function CounterPage() {
               <thead>
                 <tr>
                   <th>#</th><th>Table</th><th>Customer</th><th>Type</th>
-                  <th>Items</th><th>Total</th><th>Status</th><th>Time</th>
+                  <th>Items</th><th>Total</th><th>Status</th><th>Time</th><th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -293,6 +393,15 @@ function CounterPage() {
                     <td className="amount-cell">₹{order.totalAmount?.toFixed(2)}</td>
                     <td><span className={`badge badge-${order.status?.toLowerCase()}`}>{order.status}</span></td>
                     <td className="time-cell">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : ''}</td>
+                    <td>
+                      {order.status === 'PAID' && (
+                        <button className="btn btn-xs btn-outline" onClick={(e) => {
+                          e.stopPropagation();
+                          selectForBilling(order);
+                          setTimeout(() => window.print(), 500);
+                        }}>Print</button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -300,6 +409,12 @@ function CounterPage() {
           </div>
         )}
       </div>
+
+      {/* Hidden for screen, shown for printer */}
+      <ThermalReceipt
+        billData={billData}
+        calc={{ ...calc, discount: parseFloat(discount) || 0 }}
+      />
     </div>
   );
 }

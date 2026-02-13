@@ -18,6 +18,8 @@ public class DashboardData {
   private Map<String, Double> paymentModeBreakdown;
   private List<RecentOrder> recentOrders;
   private int lowStockCount;
+  private int expiringItemsCount;
+  private double totalWastageValue;
 
   @Data
   @AllArgsConstructor

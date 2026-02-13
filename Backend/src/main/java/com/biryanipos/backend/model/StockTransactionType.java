@@ -5,5 +5,6 @@ public enum StockTransactionType {
   ISSUE_TO_KITCHEN, // Moved from storeroom to kitchen
   ORDER_DEDUCT, // Auto-deducted when order is placed
   WASTE, // Waste / expired / damaged
-  ADJUSTMENT // Manual correction
+  ADJUSTMENT, // Manual correction
+  RETURN_FROM_ORDER // Restored stock if order cancelled
 }

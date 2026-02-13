@@ -4,7 +4,9 @@ import com.biryanipos.backend.dto.OrderRequest;
 import com.biryanipos.backend.dto.OrderItemRequest;
 import com.biryanipos.backend.model.Order;
 import com.biryanipos.backend.model.OrderStatus;
+import com.biryanipos.backend.repository.PaymentRepository;
 import com.biryanipos.backend.service.OrderService;
+import com.biryanipos.backend.service.PrintingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,7 +15,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
-import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -21,6 +22,8 @@ import org.springframework.http.HttpStatus;
 public class OrderController {
 
   private final OrderService orderService;
+  private final PrintingService printingService;
+  private final PaymentRepository paymentRepository;
 
   @PostMapping
   public ResponseEntity<Order> createOrder(@RequestBody OrderRequest request,
@@ -61,6 +64,12 @@ public class OrderController {
     return ResponseEntity.ok(orderService.addItemsToOrder(id, items));
   }
 
+  @PutMapping("/items/{itemId}/status")
+  public ResponseEntity<com.biryanipos.backend.model.OrderItem> updateItemStatus(
+      @PathVariable Long itemId, @RequestParam OrderStatus status) {
+    return ResponseEntity.ok(orderService.updateOrderItemStatus(itemId, status));
+  }
+
   @PutMapping("/{id}/cancel")
   public ResponseEntity<Order> cancelOrder(@PathVariable Long id) {
     return ResponseEntity.ok(orderService.cancelOrder(id));
@@ -82,5 +91,12 @@ public class OrderController {
     } catch (DateTimeParseException e) {
       return ResponseEntity.badRequest().body(null); // Or return a specific error DTO if needed
     }
+  }
+
+  @GetMapping("/{id}/print")
+  public ResponseEntity<String> printReceipt(@PathVariable Long id) {
+    Order order = orderService.getOrderById(id);
+    com.biryanipos.backend.model.Payment payment = paymentRepository.findByOrderId(id).orElse(null);
+    return ResponseEntity.ok(printingService.generateTextReceipt(order, payment));
   }
 }

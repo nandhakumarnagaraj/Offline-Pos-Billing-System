@@ -25,16 +25,22 @@ public class StockItem {
   private double currentStock = 0;
 
   @Column(nullable = false)
-  private double reorderLevel = 0; // Alert when stock falls below this
+  private double reorderLevel = 50.0; // Alert when stock falls below this (Default 50)
 
   private double costPerUnit;
 
-  private String supplier;
+  private String supplier; // String for backward compatibility or simple entry
+
+  @ManyToOne
+  @JoinColumn(name = "supplier_id")
+  private Supplier supplierRef;
 
   @Column(nullable = false)
   private boolean active = true;
 
   private LocalDateTime lastUpdated;
+
+  private LocalDateTime lastAuditDate;
 
   @PrePersist
   @PreUpdate
@@ -43,6 +49,6 @@ public class StockItem {
   }
 
   public boolean isLowStock() {
-    return currentStock <= reorderLevel;
+    return currentStock < 50.0 || currentStock <= reorderLevel;
   }
 }

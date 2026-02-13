@@ -16,6 +16,8 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
 
   List<MenuItem> findByCategoryId(Long categoryId);
 
+  java.util.Optional<MenuItem> findByBarcode(String barcode);
+
   @Query("SELECT m FROM MenuItem m WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :query, '%'))")
   List<MenuItem> searchByName(@Param("query") String query);
 
