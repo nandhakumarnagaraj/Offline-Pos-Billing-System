@@ -162,7 +162,7 @@ function KitchenPage() {
             {newOrders.map(order => (
               <div key={order.id} className="kds-card card-new animate-slideUp">
                 <div className="kds-card-top">
-                  <div className="kds-order-id">#{order.id}</div>
+                  <div className="kds-order-id">{order.id}</div>
                   <div className="kds-table">{order.tableNumber}</div>
                   <KDSTimer order={order} />
                 </div>
@@ -201,7 +201,7 @@ function KitchenPage() {
             {cookingOrders.map(order => (
               <div key={order.id} className="kds-card card-cooking">
                 <div className="kds-card-top">
-                  <div className="kds-order-id">#{order.id}</div>
+                  <div className="kds-order-id">{order.id}</div>
                   <div className="kds-table">{order.tableNumber}</div>
                   <KDSTimer order={order} />
                 </div>
@@ -237,7 +237,7 @@ function KitchenPage() {
             {readyOrders.map(order => (
               <div key={order.id} className="kds-card card-ready">
                 <div className="kds-card-top">
-                  <div className="kds-order-id">#{order.id}</div>
+                  <div className="kds-order-id">{order.id}</div>
                   <div className="kds-table">{order.tableNumber}</div>
                   <KDSTimer order={order} />
                 </div>

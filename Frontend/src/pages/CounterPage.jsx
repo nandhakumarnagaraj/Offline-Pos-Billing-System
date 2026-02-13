@@ -317,10 +317,6 @@ function CounterPage() {
   };
 
   const calc = calculateBill();
-  const todayRevenue = allOrders
-    .filter(o => o.status === 'PAID')
-    .reduce((sum, o) => sum + o.totalAmount, 0);
-  const pendingBillOrders = orders.filter(o => o.status === 'READY' || o.status === 'SERVED');
   const activeOrdersList = orders.filter(o => o.status !== 'PAID' && o.status !== 'CANCELLED');
 
   return (
@@ -338,17 +334,7 @@ function CounterPage() {
       <header className="counter-header">
         <div className="counter-header-left">
           <Link to="/" className="back-btn">←</Link>
-          <h1>💰 Cashier / Billing</h1>
-        </div>
-        <div className="counter-stats">
-          <div className="c-stat">
-            <span className="c-stat-val">₹{todayRevenue.toFixed(0)}</span>
-            <span className="c-stat-label">Today's Revenue</span>
-          </div>
-          <div className="c-stat">
-            <span className="c-stat-val">{pendingBillOrders.length}</span>
-            <span className="c-stat-label">Pending Bills</span>
-          </div>
+          <h1>💰 Counter</h1>
         </div>
         <nav className="counter-tabs">
           <button className={`tab ${view === 'pending' ? 'active' : ''}`} onClick={() => { setView('pending'); setSelectedOrder(null); }}>
@@ -375,7 +361,7 @@ function CounterPage() {
                 <div key={order.id} className={`counter-order-card status-${order.status?.toLowerCase()}`}
                   onClick={() => selectForBilling(order)}>
                   <div className="co-top">
-                    <span className="co-id">#{order.id}</span>
+                    <span className="co-id">{order.id}</span>
                     <span className={`badge badge-${order.status?.toLowerCase()}`}>{order.status}</span>
                   </div>
                   <div className="co-info">
@@ -422,8 +408,13 @@ function CounterPage() {
                     return matchCat && matchSearch;
                   }).map(item => (
                     <div key={item.id} className="c-item-card" onClick={() => addToCart(item)}>
-                      <div className="c-item-title">{item.name}</div>
-                      <div className="c-item-price">₹{item.price}</div>
+                      {item.imageUrl && (
+                        <img src={item.imageUrl} alt={item.name} className="c-item-img" />
+                      )}
+                      <div className="c-item-details">
+                        <div className="c-item-title">{item.name}</div>
+                        <div className="c-item-price">₹{item.price}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -478,7 +469,7 @@ function CounterPage() {
                     </div>
                   </div>
                   <div className="bill-meta">
-                    <div>Order #{billData.orderId}</div>
+                    <div>Order {billData.orderId}</div>
                     <div>Table: {billData.tableNumber}</div>
                     <div>Type: {billData.orderType?.replace('_', ' ')}</div>
                     {billData.customerName && <div>Customer: {billData.customerName}</div>}

@@ -593,7 +593,7 @@ function ManagerPage() {
                 <h3>🕐 Recent Orders</h3>
                 {dashboard.recentOrders?.slice(0, 5).map(order => (
                   <div key={order.id} className="recent-order-row">
-                    <span>#{order.id} · {order.tableNumber}</span>
+                    <span>{order.id} · {order.tableNumber}</span>
                     <span className={`badge badge-${order.status?.toLowerCase()}`}>{order.status}</span>
                     <span>₹{order.totalAmount?.toFixed(0)}</span>
                   </div>
@@ -763,7 +763,6 @@ function ManagerPage() {
                         )}
                         <div className="card-badges">
                           <span className={`veg-indicator ${item.vegetarian ? 'veg' : 'non-veg'}`}></span>
-                          <span className="category-badge">{item.category}</span>
                         </div>
                         <div className="card-status-overlay">
                           <span className={`status-pill ${item.available ? 'available' : 'unavailable'}`}>
@@ -785,7 +784,6 @@ function ManagerPage() {
                               : `₹${item.price}`}
                           </div>
                         </div>
-                        <p className="card-desc">{item.description}</p>
                         {item.variations && item.variations.length > 0 && (
                           <div className="variation-chips">
                             {item.variations.map(v => (

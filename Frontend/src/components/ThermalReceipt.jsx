@@ -31,7 +31,7 @@ const ThermalReceipt = ({ billData, calc, storeName = "BIRYANIPOS RESTAURANT" })
             <span>Time: {time}</span>
           </div>
           <div className="info-row">
-            <span>Bill No: #{billData.orderId}</span>
+            <span>Bill No: {billData.orderId}</span>
             <span>Table: {billData.tableNumber || 'Takeaway'}</span>
           </div>
           {billData.customerName && (

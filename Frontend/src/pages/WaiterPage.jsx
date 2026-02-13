@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getAvailableMenuItems, createOrder, addItemsToOrder, getActiveOrders, getTables, getActiveCategories } from '../service/api';
+import { getAvailableMenuItems, createOrder, addItemsToOrder, getActiveOrders, getTables, getActiveCategories, getOrdersByDate, processPayment, getBill } from '../service/api';
 import { connectWebSocket } from '../service/ws';
 import { saveOfflineOrder } from '../db';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +23,14 @@ function WaiterPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showVariationModal, setShowVariationModal] = useState(null); // { item }
   const [stockAlerts, setStockAlerts] = useState([]);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [billData, setBillData] = useState(null);
+  const [paymentMode, setPaymentMode] = useState('CASH');
+  const [amountReceived, setAmountReceived] = useState('');
+  const [discount, setDiscount] = useState('');
+  const [isMultiPay, setIsMultiPay] = useState(false);
+  const [addedPayments, setAddedPayments] = useState([]);
+  const [whatsappPhone, setWhatsappPhone] = useState('');
 
   useEffect(() => {
     loadData();
@@ -65,6 +73,7 @@ function WaiterPage() {
       console.error('Failed to load data:', err);
     }
   };
+
 
   const filteredItems = menuItems.filter(item => {
     const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
@@ -183,6 +192,78 @@ function WaiterPage() {
     setLoading(false);
   };
 
+  const selectForBilling = async (order) => {
+    setSelectedOrder(order);
+    try {
+      const res = await getBill(order.id);
+      setBillData(res.data);
+      setWhatsappPhone(res.data.customerPhone || '');
+      setView('bill');
+      setDiscount('');
+      setAmountReceived('');
+      setIsMultiPay(false);
+      setAddedPayments([]);
+      setPaymentMode('CASH');
+    } catch (err) { console.error(err); }
+  };
+
+  const handlePayment = async () => {
+    if (!selectedOrder) return;
+    setLoading(true);
+    try {
+      const payload = {
+        orderId: selectedOrder.id,
+        discount: parseFloat(discount) || 0,
+        transactionRef: ''
+      };
+
+      if (isMultiPay) {
+        payload.paymentModes = addedPayments;
+        payload.amountReceived = addedPayments.reduce((sum, p) => sum + p.amount, 0);
+      } else {
+        payload.paymentMode = paymentMode;
+        payload.amountReceived = parseFloat(amountReceived) || 0;
+      }
+
+      await processPayment(payload);
+      alert('✅ Payment processed!');
+      setSelectedOrder(null);
+      setBillData(null);
+      setView('orders');
+      loadData();
+    } catch (err) {
+      alert('❌ Payment failed: ' + (err.response?.data?.message || err.message));
+    }
+    setLoading(false);
+  };
+
+  const calculateBill = () => {
+    if (!billData) return {};
+    const disc = parseFloat(discount) || 0;
+    let totalCgst = 0;
+    let totalSgst = 0;
+
+    billData.items?.forEach(item => {
+      const itemGst = item.gstPercent || 5.0;
+      const itemTax = (item.total * (itemGst / 100));
+      totalCgst += itemTax / 2;
+      totalSgst += itemTax / 2;
+    });
+
+    const sub = billData.subtotal - disc;
+    const cgst = Math.round(totalCgst * 100) / 100;
+    const sgst = Math.round(totalSgst * 100) / 100;
+    const total = sub + cgst + sgst;
+    const received = parseFloat(amountReceived) || 0;
+    const change = received > total ? received - total : 0;
+    const totalPaidSoFar = addedPayments.reduce((sum, p) => sum + p.amount, 0);
+    const multiPayRemaining = Math.max(0, total - totalPaidSoFar);
+
+    return { sub, cgst, sgst, total, change, multiPayRemaining, totalPaidSoFar };
+  };
+
+  const calc = calculateBill();
+
   return (
     <div className="waiter-page">
       {stockAlerts.length > 0 && (
@@ -195,44 +276,50 @@ function WaiterPage() {
           ))}
         </div>
       )}
-      {/* Header */}
-      <header className="waiter-header">
-        <div className="header-left">
+
+      {/* Header mapped from CounterPage */}
+      <header className="waiter-header counter-header">
+        <div className="counter-header-left">
           <Link to="/" className="back-btn">←</Link>
-          <h1>🍽️ Waiter</h1>
+          <div className="header-title-group">
+            <h1>🧑‍🍳 Waiter</h1>
+          </div>
         </div>
-        <nav className="header-tabs">
-          <button className={view === 'tables' ? 'tab active' : 'tab'} onClick={() => setView('tables')}>
-            Tables
+
+
+        <nav className="counter-tabs">
+          <button className={`tab ${view === 'tables' ? 'active' : ''}`} onClick={() => setView('tables')}>
+            🪑 Tables
           </button>
-          <button className={view === 'menu' ? 'tab active' : 'tab'} onClick={() => setView('menu')}>
-            Menu
+          <button className={`tab ${view === 'menu' ? 'active' : ''}`} onClick={() => setView('menu')}>
+            🍽️ DineIn Order
           </button>
-          <button className={view === 'orders' ? 'tab active' : 'tab'} onClick={() => setView('orders')}>
-            Active Orders <span className="tab-badge">{activeOrders.length}</span>
+          <button className={`tab ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>
+            🔔 Active Orders <span className="tab-count">{activeOrders.length}</span>
           </button>
+          <button className="btn btn-outline btn-sm logout-btn-header" onClick={logout} style={{ marginLeft: '16px' }}>Sign Out</button>
         </nav>
-        <div className="header-right">
-          <button className="btn btn-outline btn-sm logout-btn-header" onClick={logout} style={{ marginLeft: '10px' }}>Sign Out</button>
-        </div>
       </header>
 
       <div className="waiter-body">
         {/* TABLE SELECTION VIEW */}
         {view === 'tables' && (
           <div className="tables-view animate-fadeIn">
-            <h2>Select a Table</h2>
-            <div className="tables-grid">
+            <h2 className="view-title">Select a Table</h2>
+            <div className="tables-grid-modern">
               {tables.map(table => (
                 <div
                   key={table.id}
-                  className={`table-card ${table.status.toLowerCase()} ${selectedTable === table.tableNumber ? 'selected' : ''}`}
+                  className={`modern-table-card ${table.status.toLowerCase()} ${selectedTable === table.tableNumber ? 'selected' : ''}`}
                   onClick={() => selectTable(table)}
                 >
-                  <div className="table-number">{table.tableNumber}</div>
-                  <div className="table-capacity">{table.capacity} seats</div>
-                  <div className={`table-status badge-${table.status.toLowerCase()}`}>
-                    {table.status}
+                  <div className="m-table-header">
+                    <span className="m-table-number">{table.tableNumber}</span>
+                    <span className={`m-table-status-dot ${table.status.toLowerCase()}`}></span>
+                  </div>
+                  <div className="m-table-body">
+                    <div className="m-table-capacity">{table.capacity} Seats</div>
+                    <div className="m-table-status-text">{table.status}</div>
                   </div>
                 </div>
               ))}
@@ -240,160 +327,305 @@ function WaiterPage() {
           </div>
         )}
 
-        {/* MENU VIEW */}
+        {/* MENU VIEW (Mirrors Cashier Takeaway Hub) */}
         {view === 'menu' && (
-          <div className="menu-view animate-fadeIn">
-            <div className="menu-top-bar">
-              <div className="selected-info">
-                {selectedTable && (
-                  <span className="selected-table">
-                    📍 Table: {selectedTable}
-                    {activeOrders.some(o => o.tableNumber === selectedTable && o.status !== 'PAID' && o.status !== 'CANCELLED') &&
-                      <span className="badge badge-warning ml-2" style={{ marginLeft: '10px', fontSize: '0.8em' }}>Adding to active order</span>}
-                  </span>
-                )}
-              </div>
-              <div className="customer-inputs">
-                <input className="input" placeholder="Customer Name (optional)" value={customerName}
-                  onChange={e => setCustomerName(e.target.value)} />
-                <input className="input" placeholder="Phone (optional)" value={customerPhone}
-                  onChange={e => setCustomerPhone(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="menu-content">
-              <div className="menu-sidebar">
-                <input className="input search-input" placeholder="🔍 Search menu..."
-                  value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                <div className="category-list">
-                  <button className={`cat-btn ${activeCategory === 'All' ? 'active' : ''}`}
-                    onClick={() => setActiveCategory('All')}>All Items</button>
-                  {categories.map(cat => (
-                    <button key={cat.id}
-                      className={`cat-btn ${activeCategory === cat.name ? 'active' : ''}`}
-                      onClick={() => setActiveCategory(cat.name)}>
-                      {cat.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="menu-items-grid">
-                {filteredItems.map(item => {
-                  const hasVariations = item.variations && item.variations.length > 0;
-                  const displayPrice = hasVariations
-                    ? Math.min(...item.variations.map(v => v.price))
-                    : item.price;
-
-                  return (
-                    <div key={item.id} className="menu-item-card" onClick={() => addToCart(item)} style={{ padding: 0, overflow: 'hidden' }}>
-                      {item.imageUrl && (
-                        <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
-                      )}
-                      <div className="item-info" style={{ padding: '12px' }}>
-                        <div className="item-name">
-                          <span className={`veg-badge ${item.vegetarian ? 'veg' : 'non-veg'}`}></span>
-                          {item.name}
-                        </div>
-                        <div className="item-desc">{item.description}</div>
-                        <div className="item-price">
-                          ₹{displayPrice}{hasVariations ? '+' : ''}
-                        </div>
-                      </div>
-
-                      {!hasVariations && cart[item.id] && (
-                        <div className="item-qty-controls" onClick={e => e.stopPropagation()}>
-                          <button className="qty-btn" onClick={() => removeFromCart(item.id)}>−</button>
-                          <span className="qty-count">{cart[item.id].qty}</span>
-                          <button className="qty-btn" onClick={() => addToCart(item)}>+</button>
-                        </div>
-                      )}
-
-                      {hasVariations && (
-                        <div className="variation-indicator">
-                          {Object.keys(cart).filter(k => k.startsWith(`${item.id}-`)).length > 0 ? 'Selected' : '+ ADD'}
-                        </div>
-                      )}
-
-                      {!hasVariations && !cart[item.id] && <div className="add-label">+ ADD</div>}
-                    </div>
-                  );
-                })}
-                {filteredItems.length === 0 && (
-                  <div className="empty-state">No items found</div>
-                )}
-              </div>
-            </div>
-
-            {/* Variation Selection Modal */}
-            {showVariationModal && (
-              <div className="modal-overlay" onClick={() => setShowVariationModal(null)}>
-                <div className="modal-content variation-modal animate-slideUp" onClick={e => e.stopPropagation()}>
-                  <h3>Select Variation: {showVariationModal.name}</h3>
-                  <div className="variation-options">
-                    {showVariationModal.variations.map(v => (
-                      <div key={v.id} className="variation-option-card" onClick={() => addToCart(showVariationModal, v)}>
-                        <div className="option-info">
-                          <span className="option-name">{v.name}</span>
-                          <span className="option-price">₹{v.price}</span>
-                        </div>
-                        <div className="option-action">+</div>
-                      </div>
+          <div className="counter-takeaway animate-fadeIn">
+            <div className="takeaway-layout">
+              {/* Left Side: Dynamic Menu Selection */}
+              <div className="takeaway-menu">
+                <div className="menu-header-c">
+                  <input className="search-c" placeholder="🔍 Search menu..."
+                    value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                  <div className="cat-scroll">
+                    <button className={`cat-btn-c ${activeCategory === 'All' ? 'active' : ''}`}
+                      onClick={() => setActiveCategory('All')}>All</button>
+                    {categories.map(cat => (
+                      <button key={cat.id} className={`cat-btn-c ${activeCategory === cat.name ? 'active' : ''}`}
+                        onClick={() => setActiveCategory(cat.name)}>{cat.name}</button>
                     ))}
                   </div>
-                  <button className="btn btn-outline btn-block mt-4" onClick={() => setShowVariationModal(null)}>Cancel</button>
+                </div>
+
+                <div className="takeaway-grid">
+                  {filteredItems.map(item => {
+                    const hasVariations = item.variations && item.variations.length > 0;
+                    const displayPrice = hasVariations
+                      ? Math.min(...item.variations.map(v => v.price))
+                      : item.price;
+                    const inCartQty = !hasVariations && cart[item.id] ? cart[item.id].qty : 0;
+
+                    return (
+                      <div key={item.id} className={`c-item-card ${inCartQty > 0 ? 'active' : ''}`} onClick={() => addToCart(item)}>
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="c-item-img" loading="lazy" />
+                        ) : (
+                          <div className="image-placeholder">🍛</div>
+                        )}
+                        <div className="c-item-details">
+                          <div className="c-item-title">{item.name}</div>
+                          <div className="c-item-price">₹{displayPrice}{hasVariations ? '+' : ''}</div>
+                        </div>
+                        {inCartQty > 0 && <div className="cart-badge-qty">{inCartQty}</div>}
+                      </div>
+                    );
+                  })}
+                  {filteredItems.length === 0 && <div className="empty-state">No items found</div>}
                 </div>
               </div>
-            )}
+
+              {/* Right Side: New Order Cart (Identical to Cashier) */}
+              <div className="takeaway-cart glass-card">
+                <div className="flex-between">
+                  <h3>🛍️ DineIn Order</h3>
+                  <div className="selected-info">
+                    {selectedTable ? (
+                      <span className="badge badge-success">Table {selectedTable}</span>
+                    ) : (
+                      <span className="badge badge-error">Table Not Selected</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="customer-inputs-c">
+                  <input className="input" placeholder="Customer Name" value={customerName}
+                    onChange={e => setCustomerName(e.target.value)} />
+                  <input className="input" placeholder="WhatsApp Number" value={customerPhone}
+                    onChange={e => setCustomerPhone(e.target.value)} />
+                </div>
+
+                <div className="cart-list-c">
+                  {Object.keys(cart).length === 0 ? (
+                    <div className="empty-cart-c">Cart is empty</div>
+                  ) : (
+                    Object.entries(cart).map(([key, c]) => (
+                      <div key={key} className="cart-item-c">
+                        <div className="item-details-c">
+                          <span className="item-name-c">{c.item.name} {c.variation ? `(${c.variation.name})` : ''}</span>
+                          <div className="item-qty-c">
+                            <button className="qty-btn-c" onClick={() => removeFromCart(key)}>−</button>
+                            <span>{c.qty}</span>
+                            <button className="qty-btn-c" onClick={() => addToCart(c.item, c.variation)}>+</button>
+                          </div>
+                        </div>
+                        <span className="item-total-c">₹{((c.variation ? c.variation.price : c.item.price) * c.qty).toFixed(0)}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="cart-footer-c">
+                  <div className="cart-grand-total">Total: ₹{cartTotal.toFixed(2)}</div>
+                  <button className="btn btn-success btn-block btn-lg" onClick={submitOrder} disabled={loading || !selectedTable || Object.keys(cart).length === 0}>
+                    {loading ? '⏳ Creating...' : '🍳 Place Order Now'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         {/* ACTIVE ORDERS VIEW */}
         {view === 'orders' && (
           <div className="orders-view animate-fadeIn">
-            <h2>Active Orders</h2>
-            {activeOrders.length === 0 && <div className="empty-state">No active orders</div>}
-            <div className="orders-list">
+            <h2 className="view-title">Active Orders Tracking</h2>
+            {activeOrders.length === 0 && (
+              <div className="empty-state-orders">
+                <div className="empty-icon">📝</div>
+                <p>No active orders at the moment</p>
+              </div>
+            )}
+            <div className="orders-grid-modern">
               {activeOrders.map(order => (
-                <div key={order.id} className={`order-card-w status-${order.status?.toLowerCase()}`}>
-                  <div className="order-card-header">
-                    <div>
-                      <strong>#{order.id}</strong> · {order.tableNumber}
-                      {order.customerName && <span> · {order.customerName}</span>}
+                <div key={order.id} className={`modern-order-card status-${order.status?.toLowerCase()}`} onClick={() => selectForBilling(order)}>
+                  <div className="m-order-header">
+                    <div className="m-order-id-group">
+                      <span className="m-order-id">{order.id}</span>
+                      <span className="m-order-table">Table {order.tableNumber}</span>
                     </div>
-                    <span className={`badge badge-${order.status?.toLowerCase()}`}>{order.status}</span>
+                    <span className={`m-order-status-pill ${order.status?.toLowerCase()}`}>{order.status}</span>
                   </div>
-                  <div className="order-card-items">
+                  <div className="m-order-body">
                     {order.items?.map(i => (
-                      <div key={i.id} className="order-item-row">
-                        <span>{i.quantity}x {i.menuItem?.name}</span>
-                        <span>₹{(i.price * i.quantity).toFixed(0)}</span>
+                      <div key={i.id} className="m-order-item">
+                        <span className="m-item-qty">{i.quantity}x</span>
+                        <span className="m-item-name">{i.menuItem?.name}</span>
+                        <span className="m-item-price">₹{(i.price * i.quantity).toFixed(0)}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="order-card-footer">
-                    <span className="order-total">Total: ₹{order.totalAmount?.toFixed(2)}</span>
-                    <span className="order-time">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : ''}</span>
+                  <div className="m-order-footer">
+                    <div className="m-order-time">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</div>
+                    <div className="m-order-total">₹{order.totalAmount?.toFixed(0)}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
+        {/* BILL VIEW (Identical to Cashier Invoice/Payment) */}
+        {view === 'bill' && billData && (
+          <div className="bill-view animate-fadeIn">
+            <div className="bill-container">
+              {/* Bill Preview */}
+              <div className="bill-preview glass-card">
+                <div className="bill-header-sec">
+                  <div className="flex-between">
+                    <h2>🧾 Invoice</h2>
+                  </div>
+                  <div className="bill-meta">
+                    <div>Order {billData.orderId}</div>
+                    <div>Table: {billData.tableNumber}</div>
+                    <div>Type: {billData.orderType?.replace('_', ' ')}</div>
+                    {billData.customerName && <div>Customer: {billData.customerName}</div>}
+                    <div>Date: {billData.createdAt}</div>
+                  </div>
+                </div>
+
+                <table className="bill-table">
+                  <thead>
+                    <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+                  </thead>
+                  <tbody>
+                    {billData.items?.map((item, i) => (
+                      <tr key={i}>
+                        <td>{item.name}</td>
+                        <td>{item.quantity}</td>
+                        <td>₹{item.unitPrice.toFixed(2)}</td>
+                        <td>₹{item.total.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="bill-totals">
+                  <div className="bill-row"><span>Subtotal</span><span>₹{billData.subtotal?.toFixed(2)}</span></div>
+                  {parseFloat(discount) > 0 && (
+                    <div className="bill-row discount"><span>Discount</span><span>-₹{parseFloat(discount).toFixed(2)}</span></div>
+                  )}
+                  <div className="bill-row"><span>CGST (2.5%)</span><span>₹{calc.cgst?.toFixed(2)}</span></div>
+                  <div className="bill-row"><span>SGST (2.5%)</span><span>₹{calc.sgst?.toFixed(2)}</span></div>
+                  <div className="bill-row bill-grand-total">
+                    <span>Grand Total</span>
+                    <span>₹{calc.total?.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Panel */}
+              <div className="payment-panel glass-card">
+                <div className="flex-between">
+                  <h3>Payment</h3>
+                  <button className="btn btn-xs btn-outline" onClick={() => { setIsMultiPay(!isMultiPay); setAddedPayments([]); }}>
+                    {isMultiPay ? 'Switch to Single Mode' : 'Enable Split Payment'}
+                  </button>
+                </div>
+
+                {!isMultiPay ? (
+                  <>
+                    <div className="payment-modes">
+                      {['CASH', 'CARD', 'UPI'].map(mode => (
+                        <button key={mode}
+                          className={`payment-mode-btn ${paymentMode === mode ? 'active' : ''}`}
+                          onClick={() => setPaymentMode(mode)}>
+                          {mode === 'CASH' ? '💵' : mode === 'CARD' ? '💳' : '📱'} {mode}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="payment-fields">
+                      <label>Discount (₹)</label>
+                      <input className="input" type="number" placeholder="0" value={discount}
+                        onChange={e => setDiscount(e.target.value)} />
+
+                      <label>Customer WhatsApp</label>
+                      <input className="input" type="text" placeholder="Phone Number" value={whatsappPhone}
+                        onChange={e => setWhatsappPhone(e.target.value)} />
+
+                      {paymentMode === 'CASH' && (
+                        <>
+                          <label>Amount Received (₹)</label>
+                          <input className="input" type="number" placeholder="0" value={amountReceived}
+                            onChange={e => setAmountReceived(e.target.value)} />
+                          {calc.change > 0 && (
+                            <div className="change-display" style={{ marginTop: '10px', color: '#10B981', fontWeight: 'bold' }}>
+                              Change: ₹{calc.change.toFixed(2)}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="multi-pay-section animate-fadeIn">
+                    <label>Discount (₹)</label>
+                    <input className="input" type="number" placeholder="0" value={discount}
+                      onChange={e => setDiscount(e.target.value)} />
+
+                    <div className="payment-summary-box">
+                      <div>Total Due: <strong>₹{calc.total.toFixed(2)}</strong></div>
+                      <div style={{ color: calc.multiPayRemaining > 0 ? '#EF4444' : '#10B981' }}>
+                        Remaining: <strong>₹{calc.multiPayRemaining.toFixed(2)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="add-payment-row">
+                      <select className="input" value={paymentMode} onChange={e => setPaymentMode(e.target.value)}>
+                        <option value="CASH">Cash</option>
+                        <option value="UPI">UPI</option>
+                        <option value="CARD">Card</option>
+                      </select>
+                      <input className="input" type="number" placeholder="Amount"
+                        value={amountReceived} onChange={e => setAmountReceived(e.target.value)} />
+                      <button className="btn btn-sm btn-primary" onClick={() => {
+                        if (!amountReceived || parseFloat(amountReceived) <= 0) return;
+                        const amt = parseFloat(amountReceived);
+                        setAddedPayments([...addedPayments, { mode: paymentMode, amount: amt }]);
+                        setAmountReceived('');
+                      }} disabled={!amountReceived}>Add</button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="payment-actions">
+                  <button className="btn btn-outline" onClick={() => { setView('orders'); setSelectedOrder(null); }}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-success btn-lg" onClick={handlePayment}
+                    disabled={loading || (isMultiPay && calc.multiPayRemaining > 0)}>
+                    {loading ? '⏳ Processing...' : (isMultiPay ? '✅ Settle Bill' : `✅ Pay ₹${calc.total?.toFixed(2)}`)}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
 
-      {/* FLOATING CART */}
-      {cartItemCount > 0 && (
-        <div className="floating-cart animate-slideUp">
-          <div className="cart-info">
-            <span className="cart-count">{cartItemCount} items</span>
-            <span className="cart-total">₹{cartTotal.toFixed(2)}</span>
+      {/* Variation Selection Modal */}
+      {showVariationModal && (
+        <div className="modal-overlay" onClick={() => setShowVariationModal(null)}>
+          <div className="modal-content-modern variation-modal animate-slideUp" onClick={e => e.stopPropagation()}>
+            <div className="modal-header-modern">
+              <h3>{showVariationModal.name}</h3>
+              <p>Select your favorite variation</p>
+            </div>
+            <div className="variation-options-modern">
+              {showVariationModal.variations.map(v => (
+                <div key={v.id} className="variation-card-modern" onClick={() => addToCart(showVariationModal, v)}>
+                  <div className="v-card-info">
+                    <span className="v-name">{v.name}</span>
+                    <span className="v-price">₹{v.price}</span>
+                  </div>
+                  <div className="v-add-icon">+</div>
+                </div>
+              ))}
+            </div>
+            <button className="modal-close-btn" onClick={() => setShowVariationModal(null)}>Dismiss</button>
           </div>
-          <button className="btn btn-primary btn-lg" onClick={submitOrder} disabled={loading}>
-            {loading ? '⏳ Placing...' : '🍳 Place Order'}
-          </button>
         </div>
       )}
+
     </div>
   );
 }
