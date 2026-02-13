@@ -234,6 +234,18 @@
   color: var(--primary-light);
 }
 
+.stat-item {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-light);
+}
+
 .stat-label {
   font-size: 0.75rem;
   color: var(--text-muted);
@@ -251,9 +263,7 @@
   .stat-item {
     min-width: 40%;
   }
-}
 
-@media (max-width: 600px) {
   .nav-grid {
     grid-template-columns: 1fr;
   }

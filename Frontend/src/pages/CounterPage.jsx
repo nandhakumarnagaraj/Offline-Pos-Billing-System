@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getOrders, getActiveOrders, processPayment, getBill, updateOrderStatus } from '../service/api';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { getOrders, getActiveOrders, processPayment, getBill, updateOrderStatus, getAvailableMenuItems, getActiveCategories, createOrder, getOrdersByDate } from '../service/api';
 import { connectWebSocket } from '../service/ws';
 import { useAuth } from '../context/AuthContext';
 import ThermalReceipt from '../components/ThermalReceipt';
@@ -19,11 +21,26 @@ function CounterPage() {
   const [isMultiPay, setIsMultiPay] = useState(false);
   const [addedPayments, setAddedPayments] = useState([]); // { mode: 'CASH', amount: 500 }
   const [loading, setLoading] = useState(false);
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+
+  // History Pagination State
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize] = useState(8);
 
   const [stockAlerts, setStockAlerts] = useState([]);
 
+  // Takeaway State
+  const [menuItems, setMenuItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [cart, setCart] = useState({});
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+
   useEffect(() => {
     loadOrders();
+    loadTakeawayData();
     const stompClient = connectWebSocket(
       (order) => {
         setOrders(prev => {
@@ -58,9 +75,22 @@ function CounterPage() {
 
   const loadOrders = async () => {
     try {
-      const [activeRes, allRes] = await Promise.all([getActiveOrders(), getOrders()]);
+      const today = new Date().toISOString().split('T')[0];
+      const [activeRes, allRes] = await Promise.all([
+        getActiveOrders(),
+        getOrdersByDate(today, today)
+      ]);
       setOrders(activeRes.data);
-      setAllOrders(allRes.data);
+      // Sort history to show newest first
+      setAllOrders(allRes.data.sort((a, b) => b.id - a.id));
+    } catch (err) { console.error(err); }
+  };
+
+  const loadTakeawayData = async () => {
+    try {
+      const [menuRes, catRes] = await Promise.all([getAvailableMenuItems(), getActiveCategories()]);
+      setMenuItems(menuRes.data);
+      setCategories(catRes.data);
     } catch (err) { console.error(err); }
   };
 
@@ -69,6 +99,7 @@ function CounterPage() {
     try {
       const res = await getBill(order.id);
       setBillData(res.data);
+      setWhatsappPhone(res.data.customerPhone || '');
       setView('bill');
       setView('bill');
       setDiscount('');
@@ -99,10 +130,11 @@ function CounterPage() {
 
       await processPayment(payload);
 
-      // Auto-trigger print if needed, or just show success
-      // window.print(); // We can trigger here
-
       alert('✅ Payment processed!');
+
+      // Automatically trigger WhatsApp PDF Share
+      await autoShareWhatsAppBill();
+
       setSelectedOrder(null);
       setBillData(null);
       setView('pending');
@@ -113,8 +145,146 @@ function CounterPage() {
     setLoading(false);
   };
 
+  const submitTakeawayOrder = async () => {
+    if (Object.keys(cart).length === 0) {
+      alert('Please add items to the order.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const orderItems = Object.values(cart).map(c => ({
+        menuItemId: c.item.id,
+        variationId: c.variation ? c.variation.id : null,
+        quantity: c.qty
+      }));
+
+      const res = await createOrder({
+        customerName,
+        customerPhone,
+        tableNumber: 'TAKEAWAY',
+        orderType: 'TAKEAWAY',
+        createdBy: 'Cashier',
+        items: orderItems
+      });
+
+      alert('✅ Takeaway order created!');
+      setCart({});
+      setCustomerName('');
+      setCustomerPhone('');
+      loadOrders();
+
+      // Auto-select for billing
+      selectForBilling(res.data);
+    } catch (err) {
+      alert('❌ Failed to create takeaway order: ' + (err.response?.data?.message || err.message));
+    }
+    setLoading(false);
+  };
+
+  const addToCart = (item, variation = null) => {
+    const cartKey = variation ? `${item.id}-${variation.id}` : `${item.id}`;
+    setCart(prev => ({
+      ...prev,
+      [cartKey]: {
+        item,
+        variation,
+        qty: (prev[cartKey]?.qty || 0) + 1
+      }
+    }));
+  };
+
+  const removeFromCart = (cartKey) => {
+    setCart(prev => {
+      const updated = { ...prev };
+      if (updated[cartKey]?.qty > 1) {
+        updated[cartKey] = { ...updated[cartKey], qty: updated[cartKey].qty - 1 };
+      } else {
+        delete updated[cartKey];
+      }
+      return updated;
+    });
+  };
+
+  const cartTotal = Object.values(cart).reduce((sum, c) => {
+    const price = c.variation ? c.variation.price : c.item.price;
+    return sum + price * c.qty;
+  }, 0);
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const getBillPDFFile = () => {
+    if (!billData) return null;
+    const doc = new jsPDF({ format: [80, 150] }); // Thermal size
+    const primaryColor = [15, 23, 42]; // Slate 900
+
+    // Branding
+    doc.setFontSize(18);
+    doc.setTextColor(...primaryColor);
+    doc.text('KhanaBook', 40, 15, { align: 'center' });
+    doc.setFontSize(8);
+    doc.text('Delicious Food, Delivered Fast', 40, 20, { align: 'center' });
+    doc.setDrawColor(200);
+    doc.line(10, 25, 70, 25);
+
+    // Meta
+    doc.setFontSize(7);
+    doc.text(`Invoice #: ${billData.orderId}`, 10, 32);
+    doc.text(`Table: ${billData.tableNumber}`, 10, 36);
+    doc.text(`Date: ${billData.createdAt}`, 10, 40);
+    if (billData.customerName) doc.text(`Customer: ${billData.customerName}`, 10, 44);
+
+    // Items Table
+    autoTable(doc, {
+      startY: 48,
+      margin: { left: 5, right: 5 },
+      head: [['Item', 'Qty', 'Total']],
+      body: billData.items.map(i => [i.name, i.quantity, i.total.toFixed(2)]),
+      theme: 'plain',
+      styles: { fontSize: 7, cellPadding: 1 },
+      headStyles: { fontStyle: 'bold', borderBottom: [0.1, 0, 0, 0] }
+    });
+
+    // Totals
+    const finalY = doc.lastAutoTable.finalY + 5;
+    doc.line(10, finalY, 70, finalY);
+    doc.setFontSize(8);
+    doc.text(`Subtotal: INR ${billData.subtotal.toFixed(2)}`, 70, finalY + 8, { align: 'right' });
+    if (parseFloat(discount) > 0) {
+      doc.text(`Discount: -INR ${parseFloat(discount).toFixed(2)}`, 70, finalY + 12, { align: 'right' });
+    }
+    doc.text(`GST (5%): INR ${(calc.cgst + calc.sgst).toFixed(2)}`, 70, finalY + 16, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`TOTAL: INR ${calc.total.toFixed(2)}`, 70, finalY + 22, { align: 'right' });
+
+    // Footer
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('Thank you for dining with us!', 40, finalY + 32, { align: 'center' });
+    doc.text('Visit again!', 40, finalY + 36, { align: 'center' });
+
+    const pdfBlob = doc.output('blob');
+    return new File([pdfBlob], `KhanaBook_Bill_${billData.orderId}.pdf`, { type: 'application/pdf' });
+  };
+
+  const autoShareWhatsAppBill = async () => {
+    if (!billData) return;
+    try {
+      const file = getBillPDFFile();
+      if (!file) return;
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `Invoice #${billData.orderId}`,
+          text: `Here is your bill from KhanaBook for ₹${calc.total.toFixed(2)}. Have a great day!`,
+        });
+      }
+    } catch (err) {
+      console.error("Auto-share failed", err);
+    }
   };
 
   const calculateBill = () => {
@@ -182,7 +352,10 @@ function CounterPage() {
         </div>
         <nav className="counter-tabs">
           <button className={`tab ${view === 'pending' ? 'active' : ''}`} onClick={() => { setView('pending'); setSelectedOrder(null); }}>
-            Pending Orders
+            Pending Bills
+          </button>
+          <button className={`tab ${view === 'takeaway' ? 'active' : ''}`} onClick={() => { setView('takeaway'); setSelectedOrder(null); }}>
+            🛍️ Takeaway
           </button>
           <button className={`tab ${view === 'history' ? 'active' : ''}`} onClick={() => { setView('history'); setSelectedOrder(null); }}>
             All Orders
@@ -225,6 +398,70 @@ function CounterPage() {
           </div>
         )}
 
+        {/* TAKEAWAY ORDERING */}
+        {view === 'takeaway' && (
+          <div className="counter-takeaway animate-fadeIn">
+            <div className="takeaway-layout">
+              <div className="takeaway-menu">
+                <div className="menu-header-c">
+                  <input className="input search-c" placeholder="🔍 Search menu..."
+                    value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                  <div className="cat-scroll">
+                    <button className={`cat-btn-c ${activeCategory === 'All' ? 'active' : ''}`}
+                      onClick={() => setActiveCategory('All')}>All</button>
+                    {categories.map(cat => (
+                      <button key={cat.id} className={`cat-btn-c ${activeCategory === cat.name ? 'active' : ''}`}
+                        onClick={() => setActiveCategory(cat.name)}>{cat.name}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="takeaway-grid">
+                  {menuItems.filter(item => {
+                    const matchCat = activeCategory === 'All' || item.category === activeCategory;
+                    const matchSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase());
+                    return matchCat && matchSearch;
+                  }).map(item => (
+                    <div key={item.id} className="c-item-card" onClick={() => addToCart(item)}>
+                      <div className="c-item-title">{item.name}</div>
+                      <div className="c-item-price">₹{item.price}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="takeaway-cart glass-card">
+                <h3>🛍️ New Order</h3>
+                <div className="customer-inputs-c">
+                  <input className="input" placeholder="Customer Name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+                  <input className="input" placeholder="WhatsApp Number" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                </div>
+                <div className="cart-list-c">
+                  {Object.entries(cart).map(([key, c]) => (
+                    <div key={key} className="cart-item-c">
+                      <div className="item-details-c">
+                        <span>{c.item.name}</span>
+                        <div className="item-qty-c">
+                          <button onClick={() => removeFromCart(key)}>−</button>
+                          <span>{c.qty}</span>
+                          <button onClick={() => addToCart(c.item, c.variation)}>+</button>
+                        </div>
+                      </div>
+                      <span className="item-total-c">₹{((c.variation?.price || c.item.price) * c.qty).toFixed(0)}</span>
+                    </div>
+                  ))}
+                  {Object.keys(cart).length === 0 && <div className="empty-cart-c">Cart is empty</div>}
+                </div>
+                <div className="cart-footer-c">
+                  <div className="cart-grand-total">Total: ₹{cartTotal.toFixed(2)}</div>
+                  <button className="btn btn-success btn-block btn-lg" onClick={submitTakeawayOrder} disabled={loading || Object.keys(cart).length === 0}>
+                    {loading ? '⏳ Creating...' : '🍳 Place Takeaway Order'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* BILL VIEW */}
         {view === 'bill' && billData && (
           <div className="bill-view animate-fadeIn">
@@ -234,9 +471,11 @@ function CounterPage() {
                 <div className="bill-header-sec">
                   <div className="flex-between">
                     <h2>🧾 Invoice</h2>
-                    <button className="btn btn-outline btn-sm print-btn-ui" onClick={handlePrint}>
-                      🖨️ Print
-                    </button>
+                    <div className="bill-actions-header">
+                      <button className="btn btn-outline btn-sm" onClick={handlePrint}>
+                        �️ Print Receipt
+                      </button>
+                    </div>
                   </div>
                   <div className="bill-meta">
                     <div>Order #{billData.orderId}</div>
@@ -303,13 +542,19 @@ function CounterPage() {
                       <input className="input" type="number" placeholder="0" value={discount}
                         onChange={e => setDiscount(e.target.value)} />
 
+                      <label>Customer WhatsApp</label>
+                      <input className="input" type="text" placeholder="Phone Number" value={whatsappPhone}
+                        onChange={e => setWhatsappPhone(e.target.value)} />
+
                       {paymentMode === 'CASH' && (
                         <>
                           <label>Amount Received (₹)</label>
                           <input className="input" type="number" placeholder="0" value={amountReceived}
                             onChange={e => setAmountReceived(e.target.value)} />
                           {calc.change > 0 && (
-                            <div className="change-display">Change: ₹{calc.change.toFixed(2)}</div>
+                            <div className="change-display" style={{ marginTop: '10px', color: '#10B981', fontWeight: 'bold' }}>
+                              Change: ₹{calc.change.toFixed(2)}
+                            </div>
                           )}
                         </>
                       )}
@@ -320,6 +565,10 @@ function CounterPage() {
                     <label>Discount (₹)</label>
                     <input className="input" type="number" placeholder="0" value={discount}
                       onChange={e => setDiscount(e.target.value)} />
+
+                    <label>Customer WhatsApp</label>
+                    <input className="input" type="text" placeholder="Phone Number" value={whatsappPhone}
+                      onChange={e => setWhatsappPhone(e.target.value)} />
 
                     <div className="payment-summary-box">
                       <div>Total Due: <strong>₹{calc.total.toFixed(2)}</strong></div>
@@ -373,39 +622,52 @@ function CounterPage() {
         {/* ORDER HISTORY */}
         {view === 'history' && (
           <div className="history-view animate-fadeIn">
-            <h2>Order History</h2>
-            <table className="history-table">
-              <thead>
-                <tr>
-                  <th>#</th><th>Table</th><th>Customer</th><th>Type</th>
-                  <th>Items</th><th>Total</th><th>Status</th><th>Time</th><th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allOrders.map(order => (
-                  <tr key={order.id} className={`row-${order.status?.toLowerCase()}`}
-                    onClick={() => order.status === 'PAID' ? selectForBilling(order) : null}>
-                    <td>{order.id}</td>
-                    <td>{order.tableNumber}</td>
-                    <td>{order.customerName || '—'}</td>
-                    <td><span className="type-tag">{order.orderType?.replace('_', ' ')}</span></td>
-                    <td>{order.items?.length}</td>
-                    <td className="amount-cell">₹{order.totalAmount?.toFixed(2)}</td>
-                    <td><span className={`badge badge-${order.status?.toLowerCase()}`}>{order.status}</span></td>
-                    <td className="time-cell">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : ''}</td>
-                    <td>
-                      {order.status === 'PAID' && (
-                        <button className="btn btn-xs btn-outline" onClick={(e) => {
-                          e.stopPropagation();
-                          selectForBilling(order);
-                          setTimeout(() => window.print(), 500);
-                        }}>Print</button>
-                      )}
-                    </td>
+            <div className="glass-card history-container">
+              <table className="history-table">
+                <thead>
+                  <tr>
+                    <th>#</th><th>Table</th><th>Type</th>
+                    <th>Items</th><th>Total</th><th>Status</th><th>Time</th><th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {allOrders.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize).map(order => (
+                    <tr key={order.id} className={`row-${order.status?.toLowerCase()}`}
+                      onClick={() => order.status === 'PAID' ? selectForBilling(order) : null}>
+                      <td><span className="order-id-badge">{order.id}</span></td>
+                      <td><span className="table-badge">{order.tableNumber}</span></td>
+                      <td><span className="type-tag">{order.orderType?.replace('_', ' ')}</span></td>
+                      <td>{order.items?.length} items</td>
+                      <td className="amount-cell">₹{order.totalAmount?.toFixed(2)}</td>
+                      <td><span className={`badge badge-${order.status?.toLowerCase()}`}>{order.status}</span></td>
+                      <td className="time-cell">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</td>
+                      <td>
+                        <div className="action-cell">
+                          {order.status === 'PAID' && (
+                            <button className="btn btn-xs btn-primary" onClick={(e) => {
+                              e.stopPropagation();
+                              selectForBilling(order);
+                              setTimeout(() => window.print(), 500);
+                            }}>🖨️ Print</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {allOrders.length === 0 && (
+                    <tr><td colSpan="8" className="empty-state">No orders for today yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+
+              {allOrders.length > historyPageSize && (
+                <div className="pagination">
+                  <button className="page-btn" disabled={historyPage === 1} onClick={() => setHistoryPage(p => p - 1)}>←</button>
+                  <span className="page-info">Page {historyPage} of {Math.ceil(allOrders.length / historyPageSize)}</span>
+                  <button className="page-btn" disabled={historyPage === Math.ceil(allOrders.length / historyPageSize)} onClick={() => setHistoryPage(p => p + 1)}>→</button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

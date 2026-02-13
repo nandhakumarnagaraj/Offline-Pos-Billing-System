@@ -19,6 +19,7 @@ This document outlines the planned enhancements and features to elevate the Offl
 - **Points System**: Earn points for every purchase (e.g., 1 point per ₹100).
 - **Redemption**: Use points for discounts.
 - **Visit History**: View customer's favorite items and last visit date.
+- **WhatsApp API Integration**: Automate hands-free PDF invoice delivery via Twilio/Meta WhatsApp Business API on payment completion.
 - **SMS Integration**: Send bill receipts and offers via SMS/WhatsApp.
 
 ---

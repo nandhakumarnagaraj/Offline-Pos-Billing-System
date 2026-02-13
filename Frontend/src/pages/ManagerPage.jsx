@@ -1323,6 +1323,36 @@ function ManagerPage() {
                     </div>
                   </div>
 
+                  {/* GST Reconciliation Section */}
+                  <div className="report-detail-columns animate-fadeIn" style={{ marginBottom: '24px' }}>
+                    <div className="report-detail-sec glass-card" style={{ gridColumn: '1 / -1' }}>
+                      <div className="flex justify-between items-center" style={{ marginBottom: '28px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '15px' }}>
+                        <h3 className="m-0" style={{ fontSize: '1.4rem' }}>🧾 GST Reconciliation</h3>
+                        <div className="badge badge-ready" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
+                          Net Payable: ₹{salesReport.netGstPayable?.toFixed(2)}
+                        </div>
+                      </div>
+                      <div className="report-metrics-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+                        <div className="metric-card-sm">
+                          <div className="metric-label">Output CGST (Sales)</div>
+                          <div className="metric-value-sm">₹{salesReport.outputCgst?.toFixed(2)}</div>
+                        </div>
+                        <div className="metric-card-sm">
+                          <div className="metric-label">Output SGST (Sales)</div>
+                          <div className="metric-value-sm">₹{salesReport.outputSgst?.toFixed(2)}</div>
+                        </div>
+                        <div className="metric-card-sm">
+                          <div className="metric-label">Input GST (Expenses)</div>
+                          <div className="metric-value-sm text-danger">₹{salesReport.inputGst?.toFixed(2)}</div>
+                        </div>
+                        <div className="metric-card-sm" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
+                          <div className="metric-label">Net GST Payable</div>
+                          <div className="metric-value-sm text-success">₹{salesReport.netGstPayable?.toFixed(2)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="report-detail-columns">
                     {/* Left: Stats Table */}
                     <div className="report-detail-sec glass-card">

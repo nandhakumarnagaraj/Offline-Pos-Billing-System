@@ -23,6 +23,12 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
   @Query("SELECT COALESCE(SUM(p.totalAmount), 0) FROM Payment p WHERE p.paidAt BETWEEN :start AND :end AND p.paymentStatus = 'COMPLETED'")
   Double sumTotalAmountBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+  @Query("SELECT COALESCE(SUM(p.cgst), 0) FROM Payment p WHERE p.paidAt BETWEEN :start AND :end AND p.paymentStatus = 'COMPLETED'")
+  Double sumCgstBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  @Query("SELECT COALESCE(SUM(p.sgst), 0) FROM Payment p WHERE p.paidAt BETWEEN :start AND :end AND p.paymentStatus = 'COMPLETED'")
+  Double sumSgstBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
   @Query("SELECT p.paymentMode, SUM(p.totalAmount) FROM Payment p WHERE p.paidAt BETWEEN :start AND :end AND p.paymentStatus = 'COMPLETED' GROUP BY p.paymentMode")
   List<Object[]> findPaymentModeBreakdownBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

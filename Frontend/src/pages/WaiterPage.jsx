@@ -213,12 +213,6 @@ function WaiterPage() {
           </button>
         </nav>
         <div className="header-right">
-          <div className="order-type-toggle">
-            <button className={orderType === 'DINE_IN' ? 'toggle active' : 'toggle'}
-              onClick={() => setOrderType('DINE_IN')}>Dine-In</button>
-            <button className={orderType === 'TAKEAWAY' ? 'toggle active' : 'toggle'}
-              onClick={() => setOrderType('TAKEAWAY')}>Takeaway</button>
-          </div>
           <button className="btn btn-outline btn-sm logout-btn-header" onClick={logout} style={{ marginLeft: '10px' }}>Sign Out</button>
         </div>
       </header>
@@ -251,15 +245,12 @@ function WaiterPage() {
           <div className="menu-view animate-fadeIn">
             <div className="menu-top-bar">
               <div className="selected-info">
-                {orderType === 'DINE_IN' && selectedTable && (
+                {selectedTable && (
                   <span className="selected-table">
                     📍 Table: {selectedTable}
                     {activeOrders.some(o => o.tableNumber === selectedTable && o.status !== 'PAID' && o.status !== 'CANCELLED') &&
                       <span className="badge badge-warning ml-2" style={{ marginLeft: '10px', fontSize: '0.8em' }}>Adding to active order</span>}
                   </span>
-                )}
-                {orderType === 'TAKEAWAY' && (
-                  <span className="selected-table">🛍️ Takeaway Order</span>
                 )}
               </div>
               <div className="customer-inputs">
