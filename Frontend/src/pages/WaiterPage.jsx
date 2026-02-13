@@ -20,6 +20,7 @@ function WaiterPage() {
   const [view, setView] = useState('tables'); // 'tables', 'menu', 'orders'
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showVariationModal, setShowVariationModal] = useState(null); // { item }
 
   useEffect(() => {
     loadData();
@@ -33,6 +34,9 @@ function WaiterPage() {
         }
         return [order, ...prev];
       });
+    }, () => {
+      // On table update, refresh table list
+      getTables().then(res => setTables(res.data));
     });
     return () => { if (stompClient) stompClient.deactivate(); };
   }, []);
@@ -60,23 +64,39 @@ function WaiterPage() {
     return matchesCategory && matchesSearch;
   });
 
-  const addToCart = (item) => {
-    setCart(prev => ({ ...prev, [item.id]: { item, qty: (prev[item.id]?.qty || 0) + 1 } }));
+  const addToCart = (item, variation = null) => {
+    if (item.variations && item.variations.length > 0 && !variation) {
+      setShowVariationModal(item);
+      return;
+    }
+    const cartKey = variation ? `${item.id}-${variation.id}` : `${item.id}`;
+    setCart(prev => ({
+      ...prev,
+      [cartKey]: {
+        item,
+        variation,
+        qty: (prev[cartKey]?.qty || 0) + 1
+      }
+    }));
+    setShowVariationModal(null);
   };
 
-  const removeFromCart = (itemId) => {
+  const removeFromCart = (cartKey) => {
     setCart(prev => {
       const updated = { ...prev };
-      if (updated[itemId]?.qty > 1) {
-        updated[itemId] = { ...updated[itemId], qty: updated[itemId].qty - 1 };
+      if (updated[cartKey]?.qty > 1) {
+        updated[cartKey] = { ...updated[cartKey], qty: updated[cartKey].qty - 1 };
       } else {
-        delete updated[itemId];
+        delete updated[cartKey];
       }
       return updated;
     });
   };
 
-  const cartTotal = Object.values(cart).reduce((sum, c) => sum + c.item.price * c.qty, 0);
+  const cartTotal = Object.values(cart).reduce((sum, c) => {
+    const price = c.variation ? c.variation.price : c.item.price;
+    return sum + price * c.qty;
+  }, 0);
   const cartItemCount = Object.values(cart).reduce((sum, c) => sum + c.qty, 0);
 
   const selectTable = (table) => {
@@ -95,9 +115,10 @@ function WaiterPage() {
       return;
     }
 
-    const orderItems = Object.entries(cart).map(([id, { qty }]) => ({
-      menuItemId: parseInt(id),
-      quantity: qty
+    const orderItems = Object.values(cart).map(c => ({
+      menuItemId: c.item.id,
+      variationId: c.variation ? c.variation.id : null,
+      quantity: c.qty
     }));
 
     setLoading(true);
@@ -214,34 +235,72 @@ function WaiterPage() {
               </div>
 
               <div className="menu-items-grid">
-                {filteredItems.map(item => (
-                  <div key={item.id} className="menu-item-card" onClick={() => addToCart(item)} style={{ padding: 0, overflow: 'hidden' }}>
-                    {item.imageUrl && (
-                      <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
-                    )}
-                    <div className="item-info" style={{ padding: '12px' }}>
-                      <div className="item-name">
-                        <span className={`veg-badge ${item.vegetarian ? 'veg' : 'non-veg'}`}></span>
-                        {item.name}
+                {filteredItems.map(item => {
+                  const hasVariations = item.variations && item.variations.length > 0;
+                  const displayPrice = hasVariations
+                    ? Math.min(...item.variations.map(v => v.price))
+                    : item.price;
+
+                  return (
+                    <div key={item.id} className="menu-item-card" onClick={() => addToCart(item)} style={{ padding: 0, overflow: 'hidden' }}>
+                      {item.imageUrl && (
+                        <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                      )}
+                      <div className="item-info" style={{ padding: '12px' }}>
+                        <div className="item-name">
+                          <span className={`veg-badge ${item.vegetarian ? 'veg' : 'non-veg'}`}></span>
+                          {item.name}
+                        </div>
+                        <div className="item-desc">{item.description}</div>
+                        <div className="item-price">
+                          ₹{displayPrice}{hasVariations ? '+' : ''}
+                        </div>
                       </div>
-                      <div className="item-desc">{item.description}</div>
-                      <div className="item-price">₹{item.price}</div>
+
+                      {!hasVariations && cart[item.id] && (
+                        <div className="item-qty-controls" onClick={e => e.stopPropagation()}>
+                          <button className="qty-btn" onClick={() => removeFromCart(item.id)}>−</button>
+                          <span className="qty-count">{cart[item.id].qty}</span>
+                          <button className="qty-btn" onClick={() => addToCart(item)}>+</button>
+                        </div>
+                      )}
+
+                      {hasVariations && (
+                        <div className="variation-indicator">
+                          {Object.keys(cart).filter(k => k.startsWith(`${item.id}-`)).length > 0 ? 'Selected' : '+ ADD'}
+                        </div>
+                      )}
+
+                      {!hasVariations && !cart[item.id] && <div className="add-label">+ ADD</div>}
                     </div>
-                    {cart[item.id] && (
-                      <div className="item-qty-controls" onClick={e => e.stopPropagation()}>
-                        <button className="qty-btn" onClick={() => removeFromCart(item.id)}>−</button>
-                        <span className="qty-count">{cart[item.id].qty}</span>
-                        <button className="qty-btn" onClick={() => addToCart(item)}>+</button>
-                      </div>
-                    )}
-                    {!cart[item.id] && <div className="add-label">+ ADD</div>}
-                  </div>
-                ))}
+                  );
+                })}
                 {filteredItems.length === 0 && (
                   <div className="empty-state">No items found</div>
                 )}
               </div>
             </div>
+
+            {/* Variation Selection Modal */}
+            {showVariationModal && (
+              <div className="modal-overlay" onClick={() => setShowVariationModal(null)}>
+                <div className="modal-content variation-modal animate-slideUp" onClick={e => e.stopPropagation()}>
+                  <h3>Select Variation: {showVariationModal.name}</h3>
+                  <div className="variation-options">
+                    {showVariationModal.variations.map(v => (
+                      <div key={v.id} className="variation-option-card" onClick={() => addToCart(showVariationModal, v)}>
+                        <div className="option-info">
+                          <span className="option-name">{v.name}</span>
+                          <span className="option-price">₹{v.price}</span>
+                        </div>
+                        <div className="option-action">+</div>
+                      </div>
+                    ))}
+                  </div>
+                  <button className="btn btn-outline btn-block mt-4" onClick={() => setShowVariationModal(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

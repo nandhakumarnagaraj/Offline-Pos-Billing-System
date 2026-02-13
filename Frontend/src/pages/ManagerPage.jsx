@@ -28,8 +28,12 @@ function ManagerPage() {
   const [salesReport, setSalesReport] = useState(null);
   const [dateRange, setDateRange] = useState({ start: new Date().toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] });
 
+  // Menu Filtering
+  const [menuSearchQuery, setMenuSearchQuery] = useState('');
+  const [menuActiveCategory, setMenuActiveCategory] = useState('All');
+
   // Forms
-  const [newItem, setNewItem] = useState({ name: '', description: '', price: '', category: 'Biryani', imageUrl: '', vegetarian: false, prepTimeMinutes: 15 });
+  const [newItem, setNewItem] = useState({ name: '', description: '', price: '', category: 'Biryani', imageUrl: '', vegetarian: false, prepTimeMinutes: 15, variations: [] });
   const [newExpense, setNewExpense] = useState({ category: 'UTILITY', description: '', amount: '', paymentMethod: 'CASH' });
   const [newStock, setNewStock] = useState({ name: '', unit: 'KG', reorderLevel: '', costPerUnit: '', supplier: '' });
   const [newUser, setNewUser] = useState({ username: '', displayName: '', role: 'WAITER' });
@@ -38,6 +42,7 @@ function ManagerPage() {
   const [newTable, setNewTable] = useState({ tableNumber: '', capacity: 4 });
   const [showForm, setShowForm] = useState('');
   const [showCategoryMgr, setShowCategoryMgr] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(null);
 
   useEffect(() => { loadDashboard(); }, []);
 
@@ -85,6 +90,24 @@ function ManagerPage() {
     setSalesReport(res.data);
   };
 
+  const addVariation = () => {
+    setNewItem({
+      ...newItem,
+      variations: [...newItem.variations, { name: '', price: 0 }]
+    });
+  };
+
+  const removeVariation = (index) => {
+    const updated = newItem.variations.filter((_, i) => i !== index);
+    setNewItem({ ...newItem, variations: updated });
+  };
+
+  const updateVariation = (index, field, value) => {
+    const updated = [...newItem.variations];
+    updated[index] = { ...updated[index], [field]: value };
+    setNewItem({ ...newItem, variations: updated });
+  };
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setShowForm('');
@@ -97,13 +120,45 @@ function ManagerPage() {
     if (tab === 'dashboard') loadDashboard();
   };
 
-  const handleAddMenuItem = async () => {
+  const handleSaveMenuItem = async () => {
     try {
-      await createMenuItem({ ...newItem, price: parseFloat(newItem.price), available: true, gstPercent: 5.0 });
-      setNewItem({ name: '', description: '', price: '', category: 'Biryani', imageUrl: '', vegetarian: false, prepTimeMinutes: 15 });
+      const itemData = {
+        ...newItem,
+        price: parseFloat(newItem.price) || 0,
+        variations: newItem.variations.map(v => ({
+          ...v,
+          price: parseFloat(v.price) || 0
+        })),
+        available: true,
+        gstPercent: 5.0
+      };
+
+      if (editingItemId) {
+        await updateMenuItem(editingItemId, itemData);
+      } else {
+        await createMenuItem(itemData);
+      }
+
+      setNewItem({ name: '', description: '', price: '', category: 'Biryani', imageUrl: '', vegetarian: false, prepTimeMinutes: 15, variations: [] });
+      setEditingItemId(null);
       setShowForm('');
       loadMenu();
-    } catch (err) { alert('Failed'); }
+    } catch (err) { alert('Failed to save menu item'); }
+  };
+
+  const handleEditClick = (item) => {
+    setNewItem({
+      name: item.name,
+      description: item.description,
+      price: item.price.toString(),
+      category: item.category,
+      imageUrl: item.imageUrl || '',
+      vegetarian: item.vegetarian,
+      prepTimeMinutes: item.prepTimeMinutes || 15,
+      variations: item.variations ? item.variations.map(v => ({ ...v, price: v.price.toString() })) : []
+    });
+    setEditingItemId(item.id);
+    setShowForm('menu');
   };
 
   const handleToggleAvail = async (id) => {
@@ -178,21 +233,21 @@ function ManagerPage() {
 
   const handleCreateUser = async () => {
     try {
-      await createUser(newUser);
+      const res = await createUser(newUser);
       setNewUser({ username: '', displayName: '', role: 'WAITER' });
       setShowForm('');
       loadUsers();
-      alert('User created! Default password is: welcome123');
+      alert(`✅ User created!\n\nUser: ${res.data.user.username}\nPassword: ${res.data.generatedPassword}\n\nPlease share this password with the user.`);
     } catch (err) { alert('Failed: ' + (err.response?.data?.message || err.message)); }
   };
 
   const handleResetPassword = async (id) => {
-    if (!confirm('Reset password to "welcome123"?')) return;
+    if (!confirm('Are you sure you want to reset this user\'s password?')) return;
     try {
-      await resetUserPassword(id);
-      alert('Password reset to: welcome123');
+      const res = await resetUserPassword(id);
+      alert(`✅ Password Reset Success!\n\nUser: ${res.data.user.username}\nNew Password: ${res.data.generatedPassword}`);
       loadUsers();
-    } catch (err) { alert('Failed'); }
+    } catch (err) { alert('Failed to reset password'); }
   };
 
   const handleToggleActive = async (id) => {
@@ -342,60 +397,229 @@ function ManagerPage() {
               </div>
             )}
 
-            {showForm === 'menu' && (
-              <div className="form-card glass-card animate-slideUp">
-                <div className="form-grid">
-                  <input className="input" placeholder="Item Name" value={newItem.name}
-                    onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
-                  <input className="input" placeholder="Price" type="number" value={newItem.price}
-                    onChange={e => setNewItem({ ...newItem, price: e.target.value })} />
-                  <select className="select" value={newItem.category}
-                    onChange={e => setNewItem({ ...newItem, category: e.target.value })}>
-                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  </select>
-                  <input className="input" placeholder="Description" value={newItem.description}
-                    onChange={e => setNewItem({ ...newItem, description: e.target.value })} />
-                  <input className="input" placeholder="Image URL (optional)" value={newItem.imageUrl || ''}
-                    onChange={e => setNewItem({ ...newItem, imageUrl: e.target.value })} />
-                  <label className="checkbox-label">
-                    <input type="checkbox" checked={newItem.vegetarian}
-                      onChange={e => setNewItem({ ...newItem, vegetarian: e.target.checked })} />
-                    Vegetarian
-                  </label>
-                  <button className="btn btn-success" onClick={handleAddMenuItem}>Save Item</button>
+            <div className="menu-grid-container">
+              <div className="menu-management-sidebar">
+                <input
+                  className="input search-input"
+                  placeholder="🔍 Search menu..."
+                  value={menuSearchQuery}
+                  onChange={e => setMenuSearchQuery(e.target.value)}
+                />
+                <div className="category-list">
+                  <button
+                    className={`cat-btn ${menuActiveCategory === 'All' ? 'active' : ''}`}
+                    onClick={() => setMenuActiveCategory('All')}
+                  >
+                    All Items
+                  </button>
+                  {categories.map(cat => (
+                    <button
+                      key={cat.id}
+                      className={`cat-btn ${menuActiveCategory === cat.name ? 'active' : ''}`}
+                      onClick={() => setMenuActiveCategory(cat.name)}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
                 </div>
               </div>
-            )}
 
-            <div className="menu-table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Name</th><th>Category</th><th>Price</th><th>Veg</th><th>Status</th><th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {menuItems.map(item => (
-                    <tr key={item.id}>
-                      <td className="name-cell">{item.name}</td>
-                      <td><span className="type-tag">{item.category}</span></td>
-                      <td className="amount-cell">₹{item.price}</td>
-                      <td>{item.vegetarian ? '🟢' : '🔴'}</td>
-                      <td>
-                        <span className={`badge ${item.available ? 'badge-ready' : 'badge-cancelled'}`}>
-                          {item.available ? 'Available' : 'Unavailable'}
-                        </span>
-                      </td>
-                      <td className="action-cell">
-                        <button className="btn btn-sm btn-outline" onClick={() => handleToggleAvail(item.id)}>
-                          {item.available ? 'Disable' : 'Enable'}
-                        </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleDeleteItem(item.id)}>Delete</button>
-                      </td>
-                    </tr>
+              <div className="menu-cards-grid">
+                {/* Add New Item Card */}
+                {!editingItemId && (
+                  <div className={`manager-menu-card add-item-card ${showForm === 'menu' ? 'editing-card' : ''} animate-fadeIn`}
+                    onClick={() => !showForm && setShowForm('menu')}>
+                    {showForm === 'menu' ? (
+                      <div className="card-edit-form">
+                        <div className="form-group">
+                          <label>Item Name</label>
+                          <input className="input input-sm" placeholder="e.g. Chicken Biryani" value={newItem.name}
+                            onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
+                        </div>
+                        <div className="form-group variations-section">
+                          <label className="flex justify-between items-center">
+                            Price Variations
+                            <button type="button" className="btn-text btn-sm" onClick={addVariation}>+ Add Variation</button>
+                          </label>
+                          {newItem.variations && newItem.variations.length > 0 ? (
+                            <div className="variations-list">
+                              {newItem.variations.map((v, idx) => (
+                                <div key={idx} className="variation-row animate-fadeIn">
+                                  <input className="input input-sm" placeholder="Variation" value={v.name}
+                                    onChange={e => updateVariation(idx, 'name', e.target.value)} />
+                                  <input className="input input-sm" type="number" placeholder="Price" value={v.price}
+                                    onChange={e => updateVariation(idx, 'price', e.target.value)} />
+                                  <button type="button" className="btn-icon btn-sm text-danger" onClick={() => removeVariation(idx)}>×</button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="form-group price-field">
+                              <input className="input input-sm" type="number" placeholder="Base Price" value={newItem.price}
+                                onChange={e => setNewItem({ ...newItem, price: e.target.value })} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="form-group">
+                          <label>Category</label>
+                          <select className="select select-sm" value={newItem.category}
+                            onChange={e => setNewItem({ ...newItem, category: e.target.value })}>
+                            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Image URL</label>
+                          <input className="input input-sm" placeholder="https://example.com/image.jpg" value={newItem.imageUrl || ''}
+                            onChange={e => setNewItem({ ...newItem, imageUrl: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Description</label>
+                          <textarea className="input input-sm" rows="2" placeholder="Item description..." value={newItem.description}
+                            onChange={e => setNewItem({ ...newItem, description: e.target.value })} />
+                        </div>
+                        <div className="form-group checkbox-group">
+                          <label className="checkbox-label">
+                            <input type="checkbox" checked={newItem.vegetarian}
+                              onChange={e => setNewItem({ ...newItem, vegetarian: e.target.checked })} />
+                            Vegetarian
+                          </label>
+                        </div>
+                        <div className="edit-actions">
+                          <button className="btn btn-primary btn-sm" onClick={handleSaveMenuItem}>Create Item</button>
+                          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setShowForm(''); }}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="add-item-content">
+                        <div className="add-icon">+</div>
+                        <span>Add New Menu Item</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {menuItems
+                  .filter(item => {
+                    const matchesCategory = menuActiveCategory === 'All' || item.category === menuActiveCategory;
+                    const matchesSearch = item.name.toLowerCase().includes(menuSearchQuery.toLowerCase());
+                    return matchesCategory && matchesSearch;
+                  })
+                  .map(item => (
+                    editingItemId === item.id ? (
+                      <div key={item.id} className="manager-menu-card editing-card animate-slideUp">
+                        <div className="card-edit-form">
+                          <div className="form-group">
+                            <label>Item Name</label>
+                            <input className="input input-sm" value={newItem.name}
+                              onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
+                          </div>
+                          <div className="form-group variations-section">
+                            <label className="flex justify-between items-center">
+                              Price Variations
+                              <button type="button" className="btn-text btn-sm" onClick={addVariation}>+ Add Variation</button>
+                            </label>
+                            {newItem.variations && newItem.variations.length > 0 ? (
+                              <div className="variations-list">
+                                {newItem.variations.map((v, idx) => (
+                                  <div key={idx} className="variation-row animate-fadeIn">
+                                    <input className="input input-sm" placeholder="Variation (e.g. Small)" value={v.name}
+                                      onChange={e => updateVariation(idx, 'name', e.target.value)} />
+                                    <input className="input input-sm" type="number" placeholder="Price" value={v.price}
+                                      onChange={e => updateVariation(idx, 'price', e.target.value)} />
+                                    <button type="button" className="btn-icon btn-sm text-danger" onClick={() => removeVariation(idx)}>×</button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="form-group price-field">
+                                <input className="input input-sm" type="number" placeholder="Base Price" value={newItem.price}
+                                  onChange={e => setNewItem({ ...newItem, price: e.target.value })} />
+                                <p className="text-xs text-muted mt-1">Leave price 0 if using variations</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="form-group">
+                            <label>Image URL</label>
+                            <input className="input input-sm" value={newItem.imageUrl || ''}
+                              onChange={e => setNewItem({ ...newItem, imageUrl: e.target.value })} />
+                          </div>
+                          <div className="form-group">
+                            <label>Description</label>
+                            <textarea className="input input-sm" rows="2" value={newItem.description}
+                              onChange={e => setNewItem({ ...newItem, description: e.target.value })} />
+                          </div>
+                          <div className="form-group checkbox-group">
+                            <label className="checkbox-label">
+                              <input type="checkbox" checked={newItem.vegetarian}
+                                onChange={e => setNewItem({ ...newItem, vegetarian: e.target.checked })} />
+                              Vegetarian
+                            </label>
+                          </div>
+                          <div className="edit-actions">
+                            <button className="btn btn-primary btn-sm" onClick={handleSaveMenuItem}>Save</button>
+                            <button className="btn btn-outline btn-sm" onClick={() => {
+                              setEditingItemId(null);
+                              setNewItem({ name: '', description: '', price: '', category: 'Biryani', imageUrl: '', vegetarian: false, prepTimeMinutes: 15, variations: [] });
+                            }}>Cancel</button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={item.id} className={`manager-menu-card ${!item.available ? 'unavailable' : ''} animate-fadeIn`}>
+                        <div className="card-img-wrap">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} />
+                          ) : (
+                            <div className="placeholder-img">🍲</div>
+                          )}
+                          <div className="card-badges">
+                            <span className={`veg-indicator ${item.vegetarian ? 'veg' : 'non-veg'}`}></span>
+                            <span className="category-badge">{item.category}</span>
+                          </div>
+                          <div className="card-status-overlay">
+                            <span className={`status-pill ${item.available ? 'available' : 'unavailable'}`}>
+                              {item.available ? 'Available' : 'Sold Out'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="card-content">
+                          <div className="card-header">
+                            <h3 className="card-title">{item.name}</h3>
+                            <div className="card-price">
+                              {item.variations && item.variations.length > 0
+                                ? `₹${Math.min(...item.variations.map(v => v.price))}+`
+                                : `₹${item.price}`}
+                            </div>
+                          </div>
+                          <p className="card-desc">{item.description}</p>
+                          {item.variations && item.variations.length > 0 && (
+                            <div className="variation-chips">
+                              {item.variations.map(v => (
+                                <span key={v.id} className="variation-chip">
+                                  {v.name}: ₹{v.price}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="card-actions-wrapper">
+                            <div className="quick-toggle">
+                              <label className="switch">
+                                <input type="checkbox" checked={item.available} onChange={() => handleToggleAvail(item.id)} />
+                                <span className="slider round"></span>
+                              </label>
+                              <span className="toggle-label">{item.available ? 'Active' : 'Hidden'}</span>
+                            </div>
+                            <div className="action-buttons">
+                              <button className="icon-btn" title="Edit Item" onClick={() => handleEditClick(item)}>✏️</button>
+                              <button className="icon-btn delete" title="Delete Item" onClick={() => handleDeleteItem(item.id)}>🗑️</button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
                   ))}
-                </tbody>
-              </table>
+                {menuItems.length === 0 && <div className="empty-state">No menu items found.</div>}
+              </div>
             </div>
           </div>
         )
@@ -463,7 +687,7 @@ function ManagerPage() {
                     <button className="btn btn-success" onClick={handleCreateUser}>Create Account</button>
                   </div>
                   <div className="form-hint" style={{ marginTop: '10px' }}>
-                    ℹ️ New users will have the default password: <code>welcome123</code>
+                    ℹ️ A secure random password will be generated for the new user.
                   </div>
                 </div>
               )}

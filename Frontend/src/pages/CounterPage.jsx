@@ -32,6 +32,15 @@ function CounterPage() {
         }
         return [...prev, order];
       });
+
+      // Update history state for PAID orders
+      if (order.status === 'PAID') {
+        setAllOrders(prev => {
+          const exists = prev.find(o => o.id === order.id);
+          if (exists) return prev.map(o => o.id === order.id ? order : o);
+          return [order, ...prev];
+        });
+      }
     });
     return () => { if (stompClient) stompClient.deactivate(); };
   }, []);
@@ -80,9 +89,21 @@ function CounterPage() {
   const calculateBill = () => {
     if (!billData) return {};
     const disc = parseFloat(discount) || 0;
+
+    // Calculate tax based on item-specific GST rates
+    let totalCgst = 0;
+    let totalSgst = 0;
+
+    billData.items?.forEach(item => {
+      const itemGst = item.gstPercent || 5.0;
+      const itemTax = (item.total * (itemGst / 100));
+      totalCgst += itemTax / 2;
+      totalSgst += itemTax / 2;
+    });
+
     const sub = billData.subtotal - disc;
-    const cgst = Math.round(sub * 2.5) / 100;
-    const sgst = Math.round(sub * 2.5) / 100;
+    const cgst = Math.round(totalCgst * 100) / 100;
+    const sgst = Math.round(totalSgst * 100) / 100;
     const total = sub + cgst + sgst;
     const received = parseFloat(amountReceived) || 0;
     const change = received > total ? received - total : 0;

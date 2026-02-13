@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.security.SecureRandom;
 import java.util.List;
 
 @Service
@@ -21,7 +22,15 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
 
-  private static final String DEFAULT_PASSWORD = "welcome123";
+  private String generateRandomPassword() {
+    final String CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    SecureRandom random = new SecureRandom();
+    StringBuilder sb = new StringBuilder(8);
+    for (int i = 0; i < 8; i++) {
+      sb.append(CHARS.charAt(random.nextInt(CHARS.length())));
+    }
+    return sb.toString();
+  }
 
   /**
    * Login — returns JWT + mustChangePassword flag
@@ -77,7 +86,7 @@ public class AuthService {
    * Manager creates a new user with default password.
    * The user must change it on first login.
    */
-  public AppUser createUser(CreateUserRequest request) {
+  public UserActionResponse createUser(CreateUserRequest request) {
     if (userRepository.existsByUsername(request.getUsername())) {
       throw new RuntimeException("Username already exists: " + request.getUsername());
     }
@@ -86,23 +95,35 @@ public class AuthService {
     user.setUsername(request.getUsername());
     user.setDisplayName(request.getDisplayName());
     user.setRole(request.getRole());
-    user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
+    String randomPassword = generateRandomPassword();
+    user.setPassword(passwordEncoder.encode(randomPassword));
+    // It's important to show the manager the generated password so they can give it
+    // to the user.
+    // For this PoC, we will just print it to the console. In a real app, this would
+    // be displayed in the UI.
+    System.out.println("New user created: " + user.getUsername() + " with password: " + randomPassword);
     user.setMustChangePassword(true);
     user.setActive(true);
 
-    return userRepository.save(user);
+    AppUser saved = userRepository.save(user);
+    return new UserActionResponse(saved, randomPassword, "User created successfully with generated password.");
   }
 
   /**
    * Manager resets a user's password back to default.
    */
-  public void resetPassword(Long userId) {
+  public UserActionResponse resetPassword(Long userId) {
+    if (userId == null)
+      throw new RuntimeException("User ID cannot be null");
     AppUser user = userRepository.findById(userId)
         .orElseThrow(() -> new RuntimeException("User not found"));
 
-    user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
+    String randomPassword = generateRandomPassword();
+    user.setPassword(passwordEncoder.encode(randomPassword));
+    System.out.println("Password for user " + user.getUsername() + " has been reset to: " + randomPassword);
     user.setMustChangePassword(true);
     userRepository.save(user);
+    return new UserActionResponse(user, randomPassword, "Password reset successfully.");
   }
 
   /**
@@ -139,7 +160,9 @@ public class AuthService {
       manager.setUsername("manager");
       manager.setDisplayName("Manager");
       manager.setRole(UserRole.MANAGER);
-      manager.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
+      String randomPassword = generateRandomPassword();
+      manager.setPassword(passwordEncoder.encode(randomPassword));
+      System.out.println("Initial manager password: " + randomPassword);
       manager.setMustChangePassword(true);
       manager.setActive(true);
       userRepository.save(manager);

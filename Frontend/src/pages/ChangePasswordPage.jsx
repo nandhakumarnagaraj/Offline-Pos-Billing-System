@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../service/api';
 import './ChangePasswordPage.css';
@@ -42,14 +43,8 @@ function ChangePasswordPage() {
 
       // Redirect based on role
       const role = user?.role;
-      if (role === 'WAITER') {
-        navigate('/waiter');
-      } else if (role === 'KITCHEN') {
-        navigate('/kitchen');
-      } else if (role === 'CASHIER') {
-        navigate('/counter');
-      } else if (role === 'MANAGER' || role === 'ADMIN') {
-        navigate('/manager');
+      if (role === 'MANAGER' || role === 'ADMIN' || role === 'WAITER' || role === 'KITCHEN' || role === 'CASHIER') {
+        navigate('/');
       } else {
         navigate('/');
       }
@@ -74,13 +69,12 @@ function ChangePasswordPage() {
             <input
               id="currentPwd"
               className="input"
-              type="password"
-              placeholder="Enter your default password"
+              placeholder="Enter temporary password"
               value={currentPassword}
               onChange={e => setCurrentPassword(e.target.value)}
               autoFocus
             />
-            <span className="form-hint">Default password is: <code>welcome123</code></span>
+            <span className="form-hint">Enter the temporary password provided by your manager.</span>
           </div>
 
           <div className="form-group">

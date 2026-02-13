@@ -20,6 +20,10 @@ public class OrderItem {
   @JoinColumn(name = "menu_item_id", nullable = false)
   private MenuItem menuItem;
 
+  @ManyToOne
+  @JoinColumn(name = "menu_item_variation_id")
+  private MenuItemVariation menuItemVariation;
+
   private int quantity;
 
   private double price; // Snapshot price

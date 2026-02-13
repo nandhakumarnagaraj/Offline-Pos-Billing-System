@@ -62,6 +62,7 @@ export const getOrderById = (id) => api.get(`/orders/${id}`);
 export const updateOrderStatus = (id, status) => api.put(`/orders/${id}/status?status=${status}`);
 export const addItemsToOrder = (id, items) => api.post(`/orders/${id}/items`, items);
 export const cancelOrder = (id) => api.put(`/orders/${id}/cancel`);
+export const extendOrderTime = (id, minutes) => api.put(`/orders/${id}/extend-time?minutes=${minutes}`);
 
 // Tables
 export const getTables = () => api.get('/tables');

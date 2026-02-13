@@ -35,7 +35,7 @@ public class AuthController {
   }
 
   @PostMapping("/create-user")
-  public ResponseEntity<AppUser> createUser(@RequestBody CreateUserRequest request) {
+  public ResponseEntity<UserActionResponse> createUser(@RequestBody CreateUserRequest request) {
     return ResponseEntity.ok(authService.createUser(request));
   }
 
@@ -45,9 +45,8 @@ public class AuthController {
   }
 
   @PutMapping("/reset-password/{userId}")
-  public ResponseEntity<Map<String, String>> resetPassword(@PathVariable Long userId) {
-    authService.resetPassword(userId);
-    return ResponseEntity.ok(Map.of("message", "Password reset to default"));
+  public ResponseEntity<UserActionResponse> resetPassword(@PathVariable Long userId) {
+    return ResponseEntity.ok(authService.resetPassword(userId));
   }
 
   @PutMapping("/toggle-active/{userId}")

@@ -29,14 +29,8 @@ function LoginPage() {
       const role = res.data.role;
       if (res.data.mustChangePassword) {
         navigate('/change-password');
-      } else if (role === 'WAITER') {
-        navigate('/waiter');
-      } else if (role === 'KITCHEN') {
-        navigate('/kitchen');
-      } else if (role === 'CASHIER') {
-        navigate('/counter');
-      } else if (role === 'MANAGER' || role === 'ADMIN') {
-        navigate('/manager');
+      } else if (role === 'MANAGER' || role === 'ADMIN' || role === 'WAITER' || role === 'KITCHEN' || role === 'CASHIER') {
+        navigate('/');
       } else {
         navigate('/');
       }

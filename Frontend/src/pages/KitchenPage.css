@@ -250,3 +250,70 @@
     gap: 10px;
   }
 }
+
+/* Timer and Extend Time Styles */
+.kds-timer {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  min-width: 80px;
+  text-align: center;
+}
+
+.timer-on-time {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+}
+
+.timer-warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #F59E0B;
+}
+
+.timer-overdue {
+  background: rgba(239, 68, 68, 0.2);
+  color: #EF4444;
+  animation: flash-red 1s infinite;
+  font-weight: 800;
+}
+
+@keyframes flash-red {
+
+  0%,
+  100% {
+    background: rgba(239, 68, 68, 0.2);
+  }
+
+  50% {
+    background: rgba(239, 68, 68, 0.5);
+  }
+}
+
+.extend-time-controls {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.btn-extend {
+  flex: 1;
+  font-size: 0.7rem;
+  padding: 6px 2px;
+  background: #1f2937;
+  color: #9ca3af;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn-extend:hover {
+  background: #374151;
+  color: #f9fafb;
+  border-color: #4b5563;
+}
+
+.mt-2 {
+  margin-top: 8px;
+}

@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
+import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -64,12 +66,21 @@ public class OrderController {
     return ResponseEntity.ok(orderService.cancelOrder(id));
   }
 
+  @PutMapping("/{id}/extend-time")
+  public ResponseEntity<Order> extendPrepTime(@PathVariable Long id, @RequestParam int minutes) {
+    return ResponseEntity.ok(orderService.extendOrderPrepTime(id, minutes));
+  }
+
   @GetMapping("/by-date")
   public ResponseEntity<List<Order>> getOrdersByDate(
       @RequestParam String start,
       @RequestParam String end) {
-    return ResponseEntity.ok(orderService.getOrdersByDateRange(
-        LocalDate.parse(start).atStartOfDay(),
-        LocalDate.parse(end).atTime(LocalTime.MAX)));
+    try {
+      return ResponseEntity.ok(orderService.getOrdersByDateRange(
+          LocalDate.parse(start).atStartOfDay(),
+          LocalDate.parse(end).atTime(LocalTime.MAX)));
+    } catch (DateTimeParseException e) {
+      return ResponseEntity.badRequest().body(null); // Or return a specific error DTO if needed
+    }
   }
 }

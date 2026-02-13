@@ -1,6 +1,7 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { getDashboard } from './service/api';
 import './App.css';
 
 // Lazy Load Pages for Performance
@@ -29,7 +30,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (user.mustChangePassword) {
+  if (user.mustChangePassword && window.location.pathname !== '/change-password') {
     return <Navigate to="/change-password" replace />;
   }
 
@@ -48,6 +49,15 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 const Home = () => {
   const { user, logout } = useAuth();
   const validRoles = ['ADMIN', 'MANAGER'];
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    if (user && validRoles.includes(user.role)) {
+      getDashboard()
+        .then(res => setStats(res.data))
+        .catch(err => console.error("Failed to load home stats", err));
+    }
+  }, [user]);
 
   return (
     <div className="home-container">
@@ -61,6 +71,27 @@ const Home = () => {
             <button className="btn btn-sm btn-outline logout-btn" onClick={logout}>Sign Out</button>
           </div>
         </div>
+
+        {stats && (
+          <div className="quick-stats animate-fadeIn">
+            <div className="stat-item">
+              <span className="stat-value">₹{stats.todayRevenue?.toFixed(0)}</span>
+              <span className="stat-label">Today's Revenue</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">{stats.todayOrders}</span>
+              <span className="stat-label">Sales</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">{stats.activeOrders}</span>
+              <span className="stat-label">Active</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">₹{stats.todayExpenses?.toFixed(0)}</span>
+              <span className="stat-label">Expenses</span>
+            </div>
+          </div>
+        )}
 
         <div className="nav-grid">
           {(validRoles.includes(user?.role) || user?.role === 'WAITER') && (

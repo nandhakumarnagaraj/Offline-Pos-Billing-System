@@ -3,16 +3,19 @@ import SockJS from 'sockjs-client';
 
 const SOCKET_URL = `http://${window.location.hostname}:8080/ws`;
 
-export const connectWebSocket = (onMessageReceived) => {
+export const connectWebSocket = (onOrderReceived, onTableUpdate) => {
   const client = new Client({
     webSocketFactory: () => new SockJS(SOCKET_URL),
     onConnect: () => {
       console.log('Connected to WebSocket');
       client.subscribe('/topic/orders', (message) => {
-        onMessageReceived(JSON.parse(message.body));
+        if (onOrderReceived) onOrderReceived(JSON.parse(message.body));
       });
       client.subscribe('/topic/orders/update', (message) => {
-        onMessageReceived(JSON.parse(message.body));
+        if (onOrderReceived) onOrderReceived(JSON.parse(message.body));
+      });
+      client.subscribe('/topic/tables', (message) => {
+        if (onTableUpdate) onTableUpdate(message.body);
       });
     },
     onStompError: (frame) => {

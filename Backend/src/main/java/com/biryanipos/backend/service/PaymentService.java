@@ -5,6 +5,7 @@ import com.biryanipos.backend.dto.PaymentRequest;
 import com.biryanipos.backend.model.*;
 import com.biryanipos.backend.repository.OrderRepository;
 import com.biryanipos.backend.repository.PaymentRepository;
+import com.biryanipos.backend.repository.TableRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -21,10 +22,14 @@ public class PaymentService {
 
   private final PaymentRepository paymentRepository;
   private final OrderRepository orderRepository;
+  private final TableRepository tableRepository;
   private final SimpMessagingTemplate messagingTemplate;
 
   @Transactional
   public Payment processPayment(PaymentRequest request) {
+    if (request.getOrderId() == null) {
+      throw new RuntimeException("Order ID is required");
+    }
     Order order = orderRepository.findById(request.getOrderId())
         .orElseThrow(() -> new RuntimeException("Order not found: " + request.getOrderId()));
 
@@ -68,10 +73,23 @@ public class PaymentService {
     // Notify all listeners
     messagingTemplate.convertAndSend("/topic/orders/update", order);
 
+    // Update table status if DINE_IN
+    if (order.getOrderType() == OrderType.DINE_IN && order.getTableNumber() != null) {
+      tableRepository.findByTableNumber(order.getTableNumber()).ifPresent(table -> {
+        table.setStatus(TableStatus.AVAILABLE);
+        table.setCurrentOrderId(null);
+        tableRepository.save(table);
+        messagingTemplate.convertAndSend("/topic/tables", "TABLE_UPDATE");
+      });
+    }
+
     return savedPayment;
   }
 
   public BillResponse generateBill(Long orderId) {
+    if (orderId == null) {
+      throw new RuntimeException("Order ID is required");
+    }
     Order order = orderRepository.findById(orderId)
         .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
 

@@ -36,6 +36,7 @@ public class Order {
   private LocalDateTime createdAt;
   private LocalDateTime completedAt;
   private LocalDateTime frozenAt; // When modification window expired
+  private LocalDateTime estimatedReadyTime;
 
   // Monetary fields
   private double subtotal; // Before tax

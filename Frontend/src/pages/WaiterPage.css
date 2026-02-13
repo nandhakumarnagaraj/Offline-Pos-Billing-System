@@ -524,6 +524,93 @@
   grid-column: 1 / -1;
 }
 
+.variation-indicator {
+  text-align: center;
+  margin: 10px;
+  background: var(--primary-glow);
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--primary-border);
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content.variation-modal {
+  background: var(--bg-secondary);
+  width: 90%;
+  max-width: 400px;
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.variation-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.variation-option-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.variation-option-card:hover {
+  border-color: var(--primary);
+  background: var(--primary-glow);
+}
+
+.option-name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.option-price {
+  color: var(--primary-light);
+  font-weight: 600;
+  margin-left: 12px;
+}
+
+.option-action {
+  width: 32px;
+  height: 32px;
+  background: var(--primary);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.btn-block {
+  width: 100%;
+}
+
 @media (max-width: 768px) {
   .waiter-header {
     flex-direction: column;

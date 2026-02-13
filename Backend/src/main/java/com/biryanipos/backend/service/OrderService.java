@@ -36,9 +36,13 @@ public class OrderService {
     order.setCreatedBy(request.getCreatedBy());
 
     double subtotal = 0;
+    int maxPrepTime = 0;
     List<OrderItem> orderItems = new ArrayList<>();
 
     for (OrderItemRequest itemRequest : request.getItems()) {
+      if (itemRequest.getMenuItemId() == null) {
+        throw new RuntimeException("Menu item ID is required");
+      }
       MenuItem menuItem = menuItemRepository.findById(itemRequest.getMenuItemId())
           .orElseThrow(() -> new RuntimeException("Menu item not found: " + itemRequest.getMenuItemId()));
 
@@ -49,12 +53,31 @@ public class OrderService {
       OrderItem orderItem = new OrderItem();
       orderItem.setMenuItem(menuItem);
       orderItem.setQuantity(itemRequest.getQuantity());
-      orderItem.setPrice(menuItem.getPrice());
+
+      double itemPrice = menuItem.getPrice();
+      if (itemRequest.getVariationId() != null) {
+        MenuItemVariation variation = menuItem.getVariations().stream()
+            .filter(v -> v.getId().equals(itemRequest.getVariationId()))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("Variation not found"));
+        orderItem.setMenuItemVariation(variation);
+        itemPrice = variation.getPrice();
+      }
+
+      orderItem.setPrice(itemPrice);
       orderItem.setOrder(order);
 
-      subtotal += menuItem.getPrice() * itemRequest.getQuantity();
+      subtotal += itemPrice * itemRequest.getQuantity();
+      int prepTime = menuItem.getPrepTimeMinutes() > 0 ? menuItem.getPrepTimeMinutes() : 10;
+      if (prepTime > maxPrepTime)
+        maxPrepTime = prepTime;
+
       orderItems.add(orderItem);
     }
+
+    if (maxPrepTime < 10)
+      maxPrepTime = 10;
+    order.setEstimatedReadyTime(LocalDateTime.now().plusMinutes(maxPrepTime));
 
     order.setItems(orderItems);
     order.setSubtotal(subtotal);
@@ -86,6 +109,9 @@ public class OrderService {
 
   @Transactional
   public Order addItemsToOrder(Long orderId, List<OrderItemRequest> newItems) {
+    if (orderId == null) {
+      throw new RuntimeException("Order ID is required");
+    }
     Order order = orderRepository.findById(orderId)
         .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
 
@@ -96,6 +122,9 @@ public class OrderService {
     double additionalSubtotal = 0;
 
     for (OrderItemRequest itemRequest : newItems) {
+      if (itemRequest.getMenuItemId() == null) {
+        throw new RuntimeException("Menu item ID is required");
+      }
       MenuItem menuItem = menuItemRepository.findById(itemRequest.getMenuItemId())
           .orElseThrow(() -> new RuntimeException("Menu item not found: " + itemRequest.getMenuItemId()));
 
@@ -106,10 +135,21 @@ public class OrderService {
       OrderItem orderItem = new OrderItem();
       orderItem.setMenuItem(menuItem);
       orderItem.setQuantity(itemRequest.getQuantity());
-      orderItem.setPrice(menuItem.getPrice());
+
+      double itemPrice = menuItem.getPrice();
+      if (itemRequest.getVariationId() != null) {
+        MenuItemVariation variation = menuItem.getVariations().stream()
+            .filter(v -> v.getId().equals(itemRequest.getVariationId()))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("Variation not found"));
+        orderItem.setMenuItemVariation(variation);
+        itemPrice = variation.getPrice();
+      }
+
+      orderItem.setPrice(itemPrice);
       orderItem.setOrder(order);
 
-      additionalSubtotal += menuItem.getPrice() * itemRequest.getQuantity();
+      additionalSubtotal += itemPrice * itemRequest.getQuantity();
       order.getItems().add(orderItem);
     }
 
@@ -209,6 +249,23 @@ public class OrderService {
       });
     }
 
+    messagingTemplate.convertAndSend("/topic/orders/update", saved);
+    return saved;
+  }
+
+  @Transactional
+  public Order extendOrderPrepTime(Long orderId, int extraMinutes) {
+    Order order = orderRepository.findById(orderId)
+        .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
+
+    if (order.getEstimatedReadyTime() == null) {
+      order.setEstimatedReadyTime(LocalDateTime.now().plusMinutes(extraMinutes));
+    } else {
+      order.setEstimatedReadyTime(order.getEstimatedReadyTime().plusMinutes(extraMinutes));
+    }
+
+    Order saved = orderRepository.save(order);
+    messagingTemplate.convertAndSend("/topic/orders", saved);
     messagingTemplate.convertAndSend("/topic/orders/update", saved);
     return saved;
   }

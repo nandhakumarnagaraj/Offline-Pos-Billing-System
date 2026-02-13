@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { getKitchenOrders, updateOrderStatus } from '../service/api';
+import { getKitchenOrders, updateOrderStatus, extendOrderTime } from '../service/api';
 import { connectWebSocket } from '../service/ws';
 import { useAuth } from '../context/AuthContext';
 import './KitchenPage.css';
@@ -31,8 +31,14 @@ function KitchenPage() {
           return updated;
         }
         // New order
-        if (!mutedRef.current && audioRef.current) {
-          audioRef.current.play().catch(() => { });
+        if (!mutedRef.current) {
+          // Speak notification
+          const msg = new SpeechSynthesisUtterance(`New order for ${order.tableNumber || 'Takeaway'}`);
+          window.speechSynthesis.speak(msg);
+
+          if (audioRef.current) {
+            audioRef.current.play().catch(() => { });
+          }
         }
         return [order, ...prev];
       });
@@ -52,6 +58,7 @@ function KitchenPage() {
   const changeStatus = async (id, newStatus) => {
     try {
       await updateOrderStatus(id, newStatus);
+      // Let WS handle the update if possible, but local update is faster for UI
       setOrders(prev => prev.map(o =>
         o.id === id ? { ...o, status: newStatus } : o
       ));
@@ -60,11 +67,48 @@ function KitchenPage() {
     }
   };
 
-  const getElapsedTime = (createdAt) => {
-    if (!createdAt) return '—';
-    const diff = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
-    if (diff < 1) return 'Just now';
-    return `${diff} min ago`;
+  const handleExtendTime = async (id, minutes) => {
+    try {
+      const res = await extendOrderTime(id, minutes);
+      setOrders(prev => prev.map(o => o.id === id ? res.data : o));
+    } catch (err) {
+      console.error('Failed to extend time:', err);
+    }
+  };
+
+  const KDSTimer = ({ order }) => {
+    const [timeLeft, setTimeLeft] = useState('');
+    const [urgency, setUrgency] = useState('on-time');
+
+    useEffect(() => {
+      const calculate = () => {
+        if (!order.estimatedReadyTime) return;
+        const now = new Date();
+        const target = new Date(order.estimatedReadyTime);
+        const diffMs = target - now;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffSecs = Math.floor((diffMs % 60000) / 1000);
+
+        if (diffMs < 0) {
+          setUrgency('overdue');
+          setTimeLeft(`LATE ${Math.abs(diffMins)}m`);
+        } else {
+          if (diffMins < 3) setUrgency('warning');
+          else setUrgency('on-time');
+          setTimeLeft(`${diffMins}:${diffSecs.toString().padStart(2, '0')}`);
+        }
+      };
+
+      calculate();
+      const timer = setInterval(calculate, 1000);
+      return () => clearInterval(timer);
+    }, [order.estimatedReadyTime]);
+
+    return (
+      <div className={`kds-timer timer-${urgency}`}>
+        {timeLeft || '---'}
+      </div>
+    );
   };
 
   const newOrders = orders.filter(o => o.status === 'NEW');
@@ -120,7 +164,7 @@ function KitchenPage() {
                 <div className="kds-card-top">
                   <div className="kds-order-id">#{order.id}</div>
                   <div className="kds-table">{order.tableNumber}</div>
-                  <div className="kds-time">{getElapsedTime(order.createdAt)}</div>
+                  <KDSTimer order={order} />
                 </div>
                 <div className="kds-items">
                   {order.items?.map(item => (
@@ -130,7 +174,12 @@ function KitchenPage() {
                     </div>
                   ))}
                 </div>
-                <button className="btn btn-warning btn-block"
+                <div className="extend-time-controls">
+                  <button className="btn btn-extend" onClick={() => handleExtendTime(order.id, 10)}>+10m</button>
+                  <button className="btn btn-extend" onClick={() => handleExtendTime(order.id, 20)}>+20m</button>
+                  <button className="btn btn-extend" onClick={() => handleExtendTime(order.id, 30)}>+30m</button>
+                </div>
+                <button className="btn btn-warning btn-block mt-2"
                   onClick={() => changeStatus(order.id, 'COOKING')}>
                   🔥 Start Cooking
                 </button>
@@ -151,7 +200,7 @@ function KitchenPage() {
                 <div className="kds-card-top">
                   <div className="kds-order-id">#{order.id}</div>
                   <div className="kds-table">{order.tableNumber}</div>
-                  <div className="kds-time">{getElapsedTime(order.createdAt)}</div>
+                  <KDSTimer order={order} />
                 </div>
                 <div className="kds-items">
                   {order.items?.map(item => (
@@ -161,7 +210,12 @@ function KitchenPage() {
                     </div>
                   ))}
                 </div>
-                <button className="btn btn-success btn-block"
+                <div className="extend-time-controls">
+                  <button className="btn btn-extend" onClick={() => handleExtendTime(order.id, 10)}>+10m</button>
+                  <button className="btn btn-extend" onClick={() => handleExtendTime(order.id, 20)}>+20m</button>
+                  <button className="btn btn-extend" onClick={() => handleExtendTime(order.id, 30)}>+30m</button>
+                </div>
+                <button className="btn btn-success btn-block mt-2"
                   onClick={() => changeStatus(order.id, 'READY')}>
                   ✅ Mark Ready
                 </button>
@@ -182,7 +236,7 @@ function KitchenPage() {
                 <div className="kds-card-top">
                   <div className="kds-order-id">#{order.id}</div>
                   <div className="kds-table">{order.tableNumber}</div>
-                  <div className="kds-time">{getElapsedTime(order.createdAt)}</div>
+                  <KDSTimer order={order} />
                 </div>
                 <div className="kds-items">
                   {order.items?.map(item => (

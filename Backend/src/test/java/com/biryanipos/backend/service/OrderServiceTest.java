@@ -42,9 +42,16 @@ class OrderServiceTest {
   }
 
   @Test
+  @SuppressWarnings("null")
   void createOrder_Success() {
     // Arrange
-    MenuItem menuItem = new MenuItem(1L, "Biryani", "Spicy", 250.0, "Main", true, null);
+    MenuItem menuItem = new MenuItem();
+    menuItem.setId(1L);
+    menuItem.setName("Biryani");
+    menuItem.setDescription("Spicy");
+    menuItem.setPrice(250.0);
+    menuItem.setCategory("Main");
+    menuItem.setAvailable(true);
     when(menuItemRepository.findById(1L)).thenReturn(Optional.of(menuItem));
 
     OrderRequest request = new OrderRequest();
@@ -90,6 +97,7 @@ class OrderServiceTest {
   }
 
   @Test
+  @SuppressWarnings("null")
   void updateStatus_Success() {
     // Arrange
     Order existingOrder = new Order();
