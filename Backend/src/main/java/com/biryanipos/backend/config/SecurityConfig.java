@@ -38,6 +38,7 @@ public class SecurityConfig {
             .requestMatchers("/api/auth/change-password").permitAll()
             .requestMatchers("/ws/**").permitAll()
             .requestMatchers("/h2-console/**").permitAll()
+            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
             // Admin/Manager only endpoints
             .requestMatchers("/api/auth/create-user").hasAnyRole("ADMIN", "MANAGER")

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getAvailableMenuItems, createOrder, addItemsToOrder, getActiveOrders, getTables, getActiveCategories, getOrdersByDate, processPayment, getBill } from '../service/api';
 import { connectWebSocket } from '../service/ws';
-import { saveOfflineOrder } from '../db';
+import { addPendingSync } from '../db';
 import { useAuth } from '../context/AuthContext';
+import LoadingOverlay from '../components/LoadingOverlay';
+import Modal from '../components/Modal';
 import './WaiterPage.css';
 
 function WaiterPage() {
@@ -75,11 +77,13 @@ function WaiterPage() {
   };
 
 
-  const filteredItems = menuItems.filter(item => {
-    const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
-    const matchesSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredItems = useMemo(() => {
+    return menuItems.filter(item => {
+      const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
+      const matchesSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [menuItems, activeCategory, searchQuery]);
 
   const addToCart = (item, variation = null) => {
     if (item.variations && item.variations.length > 0 && !variation) {
@@ -168,16 +172,15 @@ function WaiterPage() {
       loadData();
     } catch (err) {
       if (!navigator.onLine || err.code === 'ERR_NETWORK') {
-        const offlineOrder = {
+        const orderData = {
           customerName,
           customerPhone,
           tableNumber: orderType === 'DINE_IN' ? selectedTable : 'TAKEAWAY',
           orderType,
           createdBy: 'Waiter',
-          items: orderItems,
-          status: 'PENDING'
+          items: orderItems
         };
-        await saveOfflineOrder(offlineOrder);
+        await addPendingSync('CREATE_ORDER', orderData);
         alert('📡 Network error: Order saved LOCALLY. It will sync automatically when online.');
 
         setCart({});
@@ -232,7 +235,24 @@ function WaiterPage() {
       setView('orders');
       loadData();
     } catch (err) {
-      alert('❌ Payment failed: ' + (err.response?.data?.message || err.message));
+      if (!navigator.onLine || err.code === 'ERR_NETWORK') {
+        const paymentData = {
+          orderId: selectedOrder.id,
+          discount: parseFloat(discount) || 0,
+          transactionRef: '',
+          paymentModes: isMultiPay ? addedPayments : undefined,
+          paymentMode: isMultiPay ? undefined : paymentMode,
+          amountReceived: isMultiPay ? addedPayments.reduce((sum, p) => sum + p.amount, 0) : (parseFloat(amountReceived) || 0)
+        };
+        await addPendingSync('PROCESS_PAYMENT', paymentData);
+        alert('📡 Network error: Payment saved LOCALLY. It will sync automatically when online.');
+
+        setSelectedOrder(null);
+        setBillData(null);
+        setView('orders');
+      } else {
+        alert('❌ Payment failed: ' + (err.response?.data?.message || err.message));
+      }
     }
     setLoading(false);
   };
@@ -603,29 +623,26 @@ function WaiterPage() {
       </div>
 
       {/* Variation Selection Modal */}
-      {showVariationModal && (
-        <div className="modal-overlay" onClick={() => setShowVariationModal(null)}>
-          <div className="modal-content-modern variation-modal animate-slideUp" onClick={e => e.stopPropagation()}>
-            <div className="modal-header-modern">
-              <h3>{showVariationModal.name}</h3>
-              <p>Select your favorite variation</p>
+      <Modal
+        isOpen={!!showVariationModal}
+        onClose={() => setShowVariationModal(null)}
+        title={showVariationModal?.name || 'Select Variation'}
+      >
+        <div style={{ marginBottom: '16px', color: 'var(--text-secondary)' }}>Select your favorite variation</div>
+        <div className="variation-options-modern">
+          {showVariationModal?.variations?.map(v => (
+            <div key={v.id} className="variation-card-modern" onClick={() => addToCart(showVariationModal, v)}>
+              <div className="v-card-info">
+                <span className="v-name">{v.name}</span>
+                <span className="v-price">₹{v.price}</span>
+              </div>
+              <div className="v-add-icon">+</div>
             </div>
-            <div className="variation-options-modern">
-              {showVariationModal.variations.map(v => (
-                <div key={v.id} className="variation-card-modern" onClick={() => addToCart(showVariationModal, v)}>
-                  <div className="v-card-info">
-                    <span className="v-name">{v.name}</span>
-                    <span className="v-price">₹{v.price}</span>
-                  </div>
-                  <div className="v-add-icon">+</div>
-                </div>
-              ))}
-            </div>
-            <button className="modal-close-btn" onClick={() => setShowVariationModal(null)}>Dismiss</button>
-          </div>
+          ))}
         </div>
-      )}
+      </Modal>
 
+      {loading && <LoadingOverlay message="Processing Order..." />}
     </div>
   );
 }

@@ -49,14 +49,11 @@ public class CategoryService {
   public void seedCategories() {
     if (categoryRepository.count() == 0) {
       List<Category> seeds = Arrays.asList(
-          new Category(null, "Biryani", "Main course biryanis", null, 1, true),
-          new Category(null, "Starters", "Veg & Non-Veg appetizers", null, 2, true),
-          new Category(null, "Tandoori", "Kebabs and grills", null, 3, true),
-          new Category(null, "Curries", "Veg & Non-Veg gravies", null, 4, true),
-          new Category(null, "Breads", "Roti, Naan, Paratha", null, 5, true),
-          new Category(null, "Chinese", "Rice, noodles, starters", null, 6, true),
-          new Category(null, "Drinks", "Smoothies & beverages", null, 7, true),
-          new Category(null, "Desserts", "Sweet endings", null, 8, true));
+          new Category(null, "Royal Biryani Selection", "Premium Hyderabadi biryanis", null, 1, true),
+          new Category(null, "Vegetarian Biryani Delights", "Authentic veg biryani varieties", null, 2, true),
+          new Category(null, "Signature Starters and Sides", "Traditional appetizers and accompaniments", null, 3,
+              true),
+          new Category(null, "Drinks and Refreshments", "Beverages and cool drinks", null, 4, true));
       categoryRepository.saveAll(seeds);
     }
   }

@@ -92,8 +92,11 @@ public class PaymentService {
     }
 
     // If totalReceived is 0 (e.g. card payment exact), assume they paid totalAmount
-    if (totalReceived <= 0 && payment.getPaymentMode() != PaymentMode.CASH) {
-      totalReceived = totalAmount;
+    if (totalReceived <= 0) {
+      if (payment.getPaymentMode() == PaymentMode.CASH) {
+        throw new RuntimeException("Cash payment requires amount received");
+      }
+      totalReceived = totalAmount; // Assume exact for digital payments
     }
 
     payment.setAmountReceived(totalReceived);

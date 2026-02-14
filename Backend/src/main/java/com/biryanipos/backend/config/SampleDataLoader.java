@@ -26,6 +26,11 @@ public class SampleDataLoader implements CommandLineRunner {
 
   @Override
   public void run(String... args) throws Exception {
+    // Add existence check
+    if (supplierRepository.count() > 0) {
+      return; // Data already seeded
+    }
+
     // 1. Get or Create Suppliers
     Supplier s1 = supplierRepository.findByName("Fresh Farm Poultry").orElseGet(() -> {
       Supplier s = new Supplier();
@@ -92,79 +97,51 @@ public class SampleDataLoader implements CommandLineRunner {
     StockItem mutton = createStockItem("Mutton", "KG", 20, 5, 800, s1);
     StockItem egg = createStockItem("Egg", "PIECE", 500, 100, 6, s1);
     StockItem paneer = createStockItem("Paneer", "KG", 30, 5, 350, s2);
+    StockItem kathal = createStockItem("Raw Jackfruit", "KG", 20, 5, 60, s2);
+    StockItem mushroom = createStockItem("Mushroom", "KG", 20, 5, 200, s2);
 
     // Vegetables
     StockItem onion = createStockItem("Onion", "KG", 100, 20, 30, s2);
-    StockItem tomato = createStockItem("Tomato", "KG", 80, 15, 40, s2);
-    StockItem potato = createStockItem("Potato", "KG", 100, 20, 25, s2);
-    StockItem cauliflower = createStockItem("Cauliflower", "KG", 30, 5, 40, s2);
-    StockItem carrot = createStockItem("Carrot", "KG", 30, 5, 50, s2);
-    StockItem beans = createStockItem("Beans", "KG", 20, 5, 60, s2);
-    StockItem capsicum = createStockItem("Capsicum", "KG", 20, 5, 80, s2);
     StockItem ginger = createStockItem("Ginger", "KG", 10, 2, 120, s2);
-    StockItem garlic = createStockItem("Garlic", "KG", 10, 2, 150, s2);
 
     // Staples
-    StockItem rice = createStockItem("Basmati Rice", "KG", 100, 20, 110, s2); // Re-using if exists check inside create
+    StockItem rice = createStockItem("Basmati Rice", "KG", 100, 20, 110, s2);
     StockItem maida = createStockItem("Maida", "KG", 50, 10, 45, s2);
-    StockItem wheatFlour = createStockItem("Wheat Flour", "KG", 50, 10, 45, s2);
-    StockItem noodles = createStockItem("Noodles", "PACKET", 100, 20, 25, s2);
-    StockItem dal = createStockItem("Toor Dal", "KG", 50, 10, 140, s2);
 
     // Dairy
     StockItem curd = createStockItem("Curd", "LITRE", 30, 5, 70, s1);
     StockItem butter = createStockItem("Butter", "KG", 20, 5, 450, s1);
-    StockItem cream = createStockItem("Fresh Cream", "LITRE", 10, 2, 220, s1);
 
     // Oils & Spices
     StockItem oil = createStockItem("Cooking Oil", "LITRE", 100, 20, 140, s2);
     StockItem ghee = createStockItem("Ghee", "LITRE", 20, 5, 600, s2);
     StockItem spices = createStockItem("Mughlai Spices", "KG", 10, 2, 800, s2);
-    StockItem soySauce = createStockItem("Soy Sauce", "LITRE", 50, 5, 120, s2);
     StockItem sugar = createStockItem("Sugar", "KG", 50, 10, 42, s2);
     StockItem mangoPulp = createStockItem("Mango Pulp", "KG", 20, 5, 180, s2);
 
-    // 7. Link Recipes to Menu Items
-    linkRecipe("Chicken Dum Biryani", chicken, 0.250, rice, 0.150, curd, 0.050, oil, 0.050, onion, 0.100, spices,
-        0.010);
-    linkRecipe("Mutton Biryani", mutton, 0.250, rice, 0.150, curd, 0.050, ghee, 0.030, onion, 0.100, spices, 0.015);
-    linkRecipe("Veg Biryani", rice, 0.150, carrot, 0.050, beans, 0.050, potato, 0.050, curd, 0.050, oil, 0.050, spices,
-        0.010);
-    linkRecipe("Paneer Biryani", paneer, 0.150, rice, 0.150, curd, 0.050, oil, 0.050, spices, 0.010);
-    linkRecipe("Egg Biryani", egg, 2.0, rice, 0.150, oil, 0.050, spices, 0.010); // 2 eggs
+    // 7. Link Recipes to Menu Items (Matching BiryaniWale Anna names)
+    linkRecipe("Anna's Special Murg Biryani", chicken, 0.250, rice, 0.150, curd, 0.050, oil, 0.050, onion, 0.100,
+        spices, 0.010);
+    linkRecipe("Shahi Ran-E-Murg Biryani", chicken, 0.250, rice, 0.150, curd, 0.050, ghee, 0.030, spices, 0.015);
+    linkRecipe("Shahi Dum Mutton Biryani", mutton, 0.250, rice, 0.150, curd, 0.050, ghee, 0.030, spices, 0.015);
+    linkRecipe("Dum Murg Tikka Biryani", chicken, 0.200, rice, 0.150, curd, 0.050, oil, 0.050, spices, 0.010);
+    linkRecipe("Mughlai Murg Biryani", chicken, 0.200, rice, 0.150, curd, 0.050, oil, 0.050, spices, 0.010);
+    linkRecipe("Lazeez Anda Biryani", egg, 2.0, rice, 0.150, oil, 0.050, spices, 0.010);
+    linkRecipe("Anna's Royal Handi Murg Biryani", chicken, 0.400, rice, 0.250, curd, 0.100, ghee, 0.050, spices, 0.020);
 
-    linkRecipe("Chicken 65", chicken, 0.200, maida, 0.050, oil, 0.100, curd, 0.030, spices, 0.010);
-    linkRecipe("Chilli Chicken", chicken, 0.200, onion, 0.050, capsicum, 0.030, soySauce, 0.020, oil, 0.050);
-    linkRecipe("Paneer Tikka", paneer, 0.200, capsicum, 0.050, onion, 0.050, curd, 0.050, spices, 0.010);
-    linkRecipe("Gobi Manchurian", cauliflower, 0.250, maida, 0.050, soySauce, 0.020, oil, 0.100);
-    linkRecipe("Chicken Lollipop", chicken, 0.250, maida, 0.030, oil, 0.100, spices, 0.010);
+    linkRecipe("Anna's Special Paneer Biryani", paneer, 0.150, rice, 0.150, curd, 0.050, oil, 0.050, spices, 0.010);
+    linkRecipe("Dawat-E-Mushroom Biryani", mushroom, 0.150, rice, 0.150, curd, 0.050, oil, 0.050, spices, 0.010);
+    linkRecipe("Dum-Pukht Kathal Biryani", kathal, 0.150, rice, 0.150, curd, 0.050, oil, 0.050, spices, 0.010);
+    linkRecipe("Mehfil Meethi Biryani", rice, 0.150, sugar, 0.050, ghee, 0.020, spices, 0.005);
 
-    linkRecipe("Tandoori Chicken (Half)", chicken, 0.400, curd, 0.050, spices, 0.020, butter, 0.020);
-    linkRecipe("Tandoori Chicken (Full)", chicken, 0.800, curd, 0.100, spices, 0.040, butter, 0.040);
-    linkRecipe("Chicken Tikka Kebab", chicken, 0.250, curd, 0.050, spices, 0.015, butter, 0.020);
+    linkRecipe("Chettinad Chicken 65", chicken, 0.200, maida, 0.050, oil, 0.100, curd, 0.030, spices, 0.010);
+    linkRecipe("Mughlai Chicken Tikka", chicken, 0.250, curd, 0.050, spices, 0.015, butter, 0.020);
+    linkRecipe("Hara Bhara Paneer Thalicha", paneer, 0.200, curd, 0.050, spices, 0.010, oil, 0.030);
 
-    linkRecipe("Butter Chicken", chicken, 0.250, butter, 0.050, cream, 0.030, tomato, 0.100, spices, 0.010);
-    linkRecipe("Kadai Paneer", paneer, 0.200, capsicum, 0.050, onion, 0.050, tomato, 0.050, oil, 0.030, spices, 0.010);
-    linkRecipe("Dal Tadka", dal, 0.100, onion, 0.050, tomato, 0.050, garlic, 0.010, ghee, 0.025, spices, 0.005);
-    linkRecipe("Paneer Butter Masala", paneer, 0.200, butter, 0.040, cream, 0.030, tomato, 0.100, spices, 0.010);
-
-    linkRecipe("Butter Naan", maida, 0.150, butter, 0.020);
-    linkRecipe("Garlic Naan", maida, 0.150, butter, 0.020, garlic, 0.010);
-    linkRecipe("Tandoori Roti", wheatFlour, 0.120);
-    linkRecipe("Rumali Roti", maida, 0.100, wheatFlour, 0.020);
-
-    linkRecipe("Veg Fried Rice", rice, 0.200, carrot, 0.030, beans, 0.030, soySauce, 0.010, oil, 0.030);
-    linkRecipe("Chicken Fried Rice", rice, 0.200, chicken, 0.100, egg, 1.0, soySauce, 0.010, oil, 0.030);
-    linkRecipe("Veg Noodles", noodles, 1.0, carrot, 0.030, beans, 0.030, soySauce, 0.010, oil, 0.030);
-    linkRecipe("Chicken Noodles", noodles, 1.0, chicken, 0.100, soySauce, 0.010, oil, 0.030);
-
+    linkRecipe("Double Ka Meetha", milk, 0.100, sugar, 0.050, ghee, 0.020);
     linkRecipe("Sweet Lassi", curd, 0.250, sugar, 0.050);
     linkRecipe("Mango Lassi", curd, 0.200, mangoPulp, 0.050, sugar, 0.030);
-    linkRecipe("Gulab Jamun (2 pcs)", maida, 0.020, sugar, 0.050, oil, 0.050); // simplified
-
-    // Bread for Double Ka Meetha
-    StockItem bread = createStockItem("Bread", "LOAF", 20, 5, 40, s2);
-    linkRecipe("Double Ka Meetha", bread, 0.100, milk, 0.100, sugar, 0.050, ghee, 0.020);
+    linkRecipe("Gulab Jamun (2 pcs)", sugar, 0.050, oil, 0.050);
   }
 
   // Helper Methods

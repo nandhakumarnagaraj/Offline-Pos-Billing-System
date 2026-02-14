@@ -49,6 +49,7 @@ com\biryanipos\backend\config\WebSocketConfig.class
 com\biryanipos\backend\security\JwtUtil.class
 com\biryanipos\backend\dto\ExpenseRequest.class
 com\biryanipos\backend\service\PrintingService.class
+com\biryanipos\backend\dto\OrderResponseDTO.class
 com\biryanipos\backend\model\MenuItem.class
 com\biryanipos\backend\controller\PaymentController.class
 com\biryanipos\backend\repository\OrderRepository.class

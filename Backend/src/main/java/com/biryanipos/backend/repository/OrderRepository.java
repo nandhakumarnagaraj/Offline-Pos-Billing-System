@@ -24,7 +24,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
   @Query("SELECT o FROM Order o WHERE o.createdAt BETWEEN :start AND :end")
   List<Order> findByCreatedAtBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-  @Query("SELECT o FROM Order o WHERE o.status NOT IN ('PAID', 'CANCELLED') ORDER BY o.createdAt DESC")
+  @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.items WHERE o.status NOT IN ('PAID', 'CANCELLED') ORDER BY o.createdAt DESC")
   List<Order> findActiveOrders();
 
   @Query("SELECT COUNT(o) FROM Order o WHERE o.status NOT IN ('PAID', 'CANCELLED')")

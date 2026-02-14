@@ -237,186 +237,177 @@ public class MenuItemService {
         @PostConstruct
         public void seedData() {
                 if (menuItemRepository.count() == 0) {
-                        MenuItem biryani = new MenuItem(null, "Chicken Dum Biryani",
-                                        "Hyderabadi style slow cooked with basmati rice", 280.0,
-                                        "Biryani",
-                                        null, true, DEFAULT_IMAGE, 5.0, 20, false, 1, false, 0.0);
-                        biryani.addVariation(new MenuItemVariation(null, "Half", 160.0, biryani));
-                        biryani.addVariation(new MenuItemVariation(null, "Full", 280.0, biryani));
-                        biryani.addVariation(new MenuItemVariation(null, "Family Pack", 550.0, biryani));
+                        List<MenuItem> items = new ArrayList<>();
 
-                        menuItemRepository.save(biryani);
+                        // --- Royal Biryani Selection ---
+                        String biryaniImg = "https://assets.zyrosite.com/mk3qvv9bXVtzKL5v/biryanianna-YanqlgwK9qF43K15.jpg";
 
-                        List<MenuItem> items = Arrays.asList(
-                                        // Biryani
-                                        new MenuItem(null, "Mutton Biryani",
-                                                        "Tender pieces of mutton with aromatic spices", 380.0,
-                                                        "Biryani", null,
-                                                        true, DEFAULT_IMAGE, 5.0, 25, false, 2, false, 0.0),
-                                        new MenuItem(null, "Veg Biryani", "Fresh vegetables cooked with biryani rice",
-                                                        220.0, "Biryani",
-                                                        null, true,
-                                                        DEFAULT_IMAGE, 5.0, 20, true, 3, false, 0.0),
-                                        new MenuItem(null, "Paneer Biryani", "Marinated paneer cues in spiced rice",
-                                                        260.0, "Biryani", null,
-                                                        true,
-                                                        DEFAULT_IMAGE, 5.0, 20, true, 4, false, 0.0),
-                                        new MenuItem(null, "Egg Biryani", "Boiled eggs tossed in spicy biryani rice",
-                                                        240.0, "Biryani",
-                                                        null, true,
-                                                        DEFAULT_IMAGE, 5.0, 20, false, 5, false, 0.0),
-                                        new MenuItem(null, "Chicken Family Pack", "Serves 3-4 people", 850.0, "Biryani",
-                                                        null, true, DEFAULT_IMAGE,
-                                                        5.0, 30,
-                                                        false, 6, false, 0.0),
+                        // 1. Anna's Special Murg Biryani
+                        MenuItem specialMurg = new MenuItem(null, "Anna's Special Murg Biryani",
+                                        "Fusion of Chicken 65 with dum-cooked biryani", 299.0,
+                                        "Royal Biryani Selection", null, true, biryaniImg, 5.0, 20, false, 1, false,
+                                        0.0);
+                        specialMurg.addVariation(new MenuItemVariation(null, "M - 750 gms", 299.0, specialMurg));
+                        specialMurg.addVariation(new MenuItemVariation(null, "L - 1 Kg", 399.0, specialMurg));
+                        items.add(specialMurg);
 
-                                        // Starters
-                                        new MenuItem(null, "Chicken 65", "Spicy deep fried chicken chunks", 240.0,
-                                                        "Starters", null, true,
-                                                        DEFAULT_IMAGE, 5.0,
-                                                        15, false, 7, false, 0.0),
-                                        new MenuItem(null, "Chilli Chicken", "Indo-Chinese style spicy chicken", 240.0,
-                                                        "Starters", null,
-                                                        true, DEFAULT_IMAGE,
-                                                        5.0, 15, false, 8, false, 0.0),
-                                        new MenuItem(null, "Paneer Tikka", "Grilled cottage cheese marinated in yogurt",
-                                                        220.0, "Starters",
-                                                        null,
-                                                        true, DEFAULT_IMAGE, 5.0, 15, true, 9, false, 0.0),
-                                        new MenuItem(null, "Gobi Manchurian", "Cauliflower florets in tangy sauce",
-                                                        180.0, "Starters", null,
-                                                        true,
-                                                        DEFAULT_IMAGE, 5.0, 15, true, 10, false, 0.0),
-                                        new MenuItem(null, "Chicken Lollipop", "Spicy fried chicken wings - 6 pcs",
-                                                        260.0, "Starters", null,
-                                                        true,
-                                                        DEFAULT_IMAGE, 5.0, 15, false, 11, false, 0.0),
+                        // 2. Shahi Ran-E-Murg Biryani
+                        MenuItem ranEMurg = new MenuItem(null, "Shahi Ran-E-Murg Biryani",
+                                        "Whole cut chicken thigh marinated with aromatic spices", 374.0,
+                                        "Royal Biryani Selection", null, true, biryaniImg, 5.0, 25, false, 2, false,
+                                        0.0);
+                        ranEMurg.addVariation(new MenuItemVariation(null, "M - 750 gms", 374.0, ranEMurg));
+                        ranEMurg.addVariation(new MenuItemVariation(null, "L - 1 Kg", 498.0, ranEMurg));
+                        items.add(ranEMurg);
 
-                                        // Tandoori
-                                        new MenuItem(null, "Tandoori Chicken (Half)",
-                                                        "Roasted chicken with yogurt and spices", 280.0,
-                                                        "Tandoori",
-                                                        null, true, DEFAULT_IMAGE, 5.0, 20, false, 12, false, 0.0),
-                                        new MenuItem(null, "Tandoori Chicken (Full)", "Whole roasted chicken", 550.0,
-                                                        "Tandoori", null,
-                                                        true, DEFAULT_IMAGE,
-                                                        5.0, 25, false, 13, false, 0.0),
-                                        new MenuItem(null, "Chicken Tikka Kebab",
-                                                        "Boneless chicken marinated and grilled", 290.0,
-                                                        "Tandoori", null,
-                                                        true, DEFAULT_IMAGE, 5.0, 15, false, 14, false, 0.0),
-                                        new MenuItem(null, "Tangdi Kebab", "Chicken drumsticks grilled to perfection",
-                                                        300.0, "Tandoori",
-                                                        null, true,
-                                                        DEFAULT_IMAGE, 5.0, 20, false, 15, false, 0.0),
+                        // 3. Shahi Dum Mutton Biryani
+                        MenuItem muttonBiryani = new MenuItem(null, "Shahi Dum Mutton Biryani",
+                                        "Boneless mutton pieces marinated and dum-cooked over charcoal", 374.0,
+                                        "Royal Biryani Selection", null, true, biryaniImg, 5.0, 30, false, 3, false,
+                                        0.0);
+                        muttonBiryani.addVariation(new MenuItemVariation(null, "M - 750 gms", 374.0, muttonBiryani));
+                        muttonBiryani.addVariation(new MenuItemVariation(null, "L - 1 Kg", 498.0, muttonBiryani));
+                        items.add(muttonBiryani);
 
-                                        // Curries
-                                        new MenuItem(null, "Butter Chicken", "Chicken in rich tomato butter gravy",
-                                                        280.0, "Curries", null,
-                                                        true,
-                                                        DEFAULT_IMAGE, 5.0, 15, false, 16, false, 0.0),
-                                        new MenuItem(null, "Kadai Paneer", "Paneer cooked with bell peppers and spices",
-                                                        260.0, "Curries",
-                                                        null, true,
-                                                        DEFAULT_IMAGE, 5.0, 15, true, 17, false, 0.0),
-                                        new MenuItem(null, "Dal Tadka", "Yellow lentils tempered with garlic and cumin",
-                                                        180.0, "Curries",
-                                                        null, true,
-                                                        DEFAULT_IMAGE, 5.0, 10, true, 18, false, 0.0),
-                                        new MenuItem(null, "Paneer Butter Masala",
-                                                        "Cottage cheese in creamy tomato gravy", 260.0,
-                                                        "Curries", null,
-                                                        true, DEFAULT_IMAGE, 5.0, 15, true, 19, false, 0.0),
+                        // 4. Dum Murg Tikka Biryani
+                        MenuItem tikkaBiryani = new MenuItem(null, "Dum Murg Tikka Biryani",
+                                        "Succulent chicken tikka pieces in aromatic biryani rice", 299.0,
+                                        "Royal Biryani Selection", null, true, biryaniImg, 5.0, 20, false, 4, false,
+                                        0.0);
+                        tikkaBiryani.addVariation(new MenuItemVariation(null, "M - 750 gms", 299.0, tikkaBiryani));
+                        tikkaBiryani.addVariation(new MenuItemVariation(null, "L - 1 Kg", 399.0, tikkaBiryani));
+                        items.add(tikkaBiryani);
 
-                                        // Breads
-                                        new MenuItem(null, "Butter Naan", "Leavened flatbread with butter", 45.0,
-                                                        "Breads", null, true,
-                                                        DEFAULT_IMAGE, 5.0, 5,
-                                                        true, 20, false, 0.0),
-                                        new MenuItem(null, "Garlic Naan", "Naan topped with minced garlic", 55.0,
-                                                        "Breads", null, true,
-                                                        DEFAULT_IMAGE, 5.0, 5,
-                                                        true, 21, false, 0.0),
-                                        new MenuItem(null, "Tandoori Roti", "Whole wheat bread baked in clay oven",
-                                                        35.0, "Breads", null,
-                                                        true, DEFAULT_IMAGE,
-                                                        5.0, 5, true, 22, false, 0.0),
-                                        new MenuItem(null, "Rumali Roti", "Thin soft handkerchief bread", 40.0,
-                                                        "Breads", null, true, DEFAULT_IMAGE,
-                                                        5.0, 5,
-                                                        true, 23, false, 0.0),
+                        // 5. Mughlai Murg Biryani
+                        MenuItem mughlaiMurg = new MenuItem(null, "Mughlai Murg Biryani",
+                                        "Boneless chicken marinated in bhuna spices and dum-cooked", 194.0,
+                                        "Royal Biryani Selection", null, true, biryaniImg, 5.0, 20, false, 5, false,
+                                        0.0);
+                        mughlaiMurg.addVariation(new MenuItemVariation(null, "M - 750 gms", 194.0, mughlaiMurg));
+                        mughlaiMurg.addVariation(new MenuItemVariation(null, "L - 1 Kg", 298.0, mughlaiMurg));
+                        items.add(mughlaiMurg);
 
-                                        // Chinese
-                                        new MenuItem(null, "Veg Fried Rice", "Stir fried rice with vegetables", 180.0,
-                                                        "Chinese", null,
-                                                        true, DEFAULT_IMAGE,
-                                                        5.0, 10, true, 24, false, 0.0),
-                                        new MenuItem(null, "Chicken Fried Rice",
-                                                        "Fried rice with chicken chunks and egg", 220.0, "Chinese",
-                                                        null,
-                                                        true, DEFAULT_IMAGE, 5.0, 10, false, 25, false, 0.0),
-                                        new MenuItem(null, "Veg Noodles", "Hakka style noodles with veggies", 180.0,
-                                                        "Chinese", null, true,
-                                                        DEFAULT_IMAGE, 5.0,
-                                                        10, true, 26, false, 0.0),
-                                        new MenuItem(null, "Chicken Noodles", "Noodles tossed with chicken and spices",
-                                                        220.0, "Chinese",
-                                                        null, true,
-                                                        DEFAULT_IMAGE, 5.0, 10, false, 27, false, 0.0),
+                        // 6. Lazeez Anda Biryani
+                        MenuItem andaBiryani = new MenuItem(null, "Lazeez Anda Biryani",
+                                        "Double egg biryani with aromatic spices", 149.0, "Royal Biryani Selection",
+                                        null, true, biryaniImg, 5.0, 15, false, 6, false, 0.0);
+                        andaBiryani.addVariation(new MenuItemVariation(null, "M - 750 gms", 149.0, andaBiryani));
+                        andaBiryani.addVariation(new MenuItemVariation(null, "L - 1 Kg", 198.0, andaBiryani));
+                        items.add(andaBiryani);
 
-                                        // Drinks
-                                        new MenuItem(null, "Coke (250ml)", "Carbonated soft drink", 40.0, "Drinks",
-                                                        null, true, DEFAULT_IMAGE, 5.0,
-                                                        2, true,
-                                                        28, true, 50.0),
-                                        new MenuItem(null, "Sprite (250ml)", "Carbonated soft drink", 40.0, "Drinks",
-                                                        null, true, DEFAULT_IMAGE, 5.0,
-                                                        2, true,
-                                                        29, true, 50.0),
-                                        new MenuItem(null, "Sweet Lassi", "Traditional yogurt churned drink", 80.0,
-                                                        "Drinks", null, true,
-                                                        DEFAULT_IMAGE, 5.0,
-                                                        5, true, 30, false, 0.0),
-                                        new MenuItem(null, "Mango Lassi", "Yogurt drink with mango pulp", 100.0,
-                                                        "Drinks", null, true, DEFAULT_IMAGE,
-                                                        5.0, 5,
-                                                        true, 31, false, 0.0),
-                                        new MenuItem(null, "Mineral Water", "Packaged drinking water", 30.0, "Drinks",
-                                                        null, true, DEFAULT_IMAGE,
-                                                        5.0, 1, true,
-                                                        32, true, 100.0),
+                        // 7. Anna's Royal Handi Murg Biryani
+                        MenuItem handiBiryani = new MenuItem(null, "Anna's Royal Handi Murg Biryani",
+                                        "Serves 2 | Loaded with 50% more boneless chicken", 499.0,
+                                        "Royal Biryani Selection", null, true, biryaniImg, 5.0, 30, false, 7, false,
+                                        0.0);
+                        items.add(handiBiryani);
 
-                                        // Desserts
-                                        new MenuItem(null, "Gulab Jamun (2 pcs)",
-                                                        "Soft milk solids soaked in sugar syrup", 80.0,
-                                                        "Desserts", null,
-                                                        true, DEFAULT_IMAGE, 5.0, 2, true, 33, false, 0.0),
-                                        new MenuItem(null, "Double Ka Meetha", "Bread pudding with dry fruits", 100.0,
-                                                        "Desserts", null,
-                                                        true, DEFAULT_IMAGE,
-                                                        5.0, 5, true, 34, false, 0.0),
-                                        new MenuItem(null, "Vanilla Ice Cream", "Classic vanilla scoop", 60.0,
-                                                        "Desserts", null, true, DEFAULT_IMAGE,
-                                                        5.0, 2,
-                                                        true, 35, false, 0.0));
+                        // --- Vegetarian Biryani Delights ---
+                        String vegBiryaniImg = "https://assets.zyrosite.com/mk3qvv9bXVtzKL5v/biryanianna-YanqlgwK9qF43K15.jpg";
+
+                        // 8. Anna's Special Paneer Biryani
+                        MenuItem specialPaneer = new MenuItem(null, "Anna's Special Paneer Biryani",
+                                        "Soft fresh paneer marinated with royal spices", 224.0,
+                                        "Vegetarian Biryani Delights", null, true, vegBiryaniImg, 5.0, 20, true, 8,
+                                        false, 0.0);
+                        specialPaneer.addVariation(new MenuItemVariation(null, "M - 750 gms", 224.0, specialPaneer));
+                        specialPaneer.addVariation(new MenuItemVariation(null, "L - 1 Kg", 324.0, specialPaneer));
+                        items.add(specialPaneer);
+
+                        // 9. Dawat-E-Mushroom Biryani
+                        MenuItem mushroomBiryani = new MenuItem(null, "Dawat-E-Mushroom Biryani",
+                                        "Chunks of marinated mushrooms cooked with shahi masalas", 194.0,
+                                        "Vegetarian Biryani Delights", null, true, vegBiryaniImg, 5.0, 20, true, 9,
+                                        false, 0.0);
+                        mushroomBiryani.addVariation(
+                                        new MenuItemVariation(null, "M - 750 gms", 194.0, mushroomBiryani));
+                        mushroomBiryani.addVariation(new MenuItemVariation(null, "L - 1 Kg", 298.0, mushroomBiryani));
+                        items.add(mushroomBiryani);
+
+                        // 10. Dum-Pukht Kathal Biryani
+                        MenuItem kathalBiryani = new MenuItem(null, "Dum-Pukht Kathal Biryani",
+                                        "Raw jackfruit biryani, a vegetarian classic", 149.0,
+                                        "Vegetarian Biryani Delights", null, true, vegBiryaniImg, 5.0, 20, true, 10,
+                                        false, 0.0);
+                        kathalBiryani.addVariation(new MenuItemVariation(null, "M - 750 gms", 149.0, kathalBiryani));
+                        kathalBiryani.addVariation(new MenuItemVariation(null, "L - 1 Kg", 198.0, kathalBiryani));
+                        items.add(kathalBiryani);
+
+                        // 11. Mehfil Meethi Biryani
+                        MenuItem meethiBiryani = new MenuItem(null, "Mehfil Meethi Biryani",
+                                        "Sweet biryani for a royal experience", 149.0, "Vegetarian Biryani Delights",
+                                        null, true, vegBiryaniImg, 5.0, 15, true, 11, false, 0.0);
+                        meethiBiryani.addVariation(new MenuItemVariation(null, "M - 750 gms", 149.0, meethiBiryani));
+                        meethiBiryani.addVariation(new MenuItemVariation(null, "L - 1 Kg", 198.0, meethiBiryani));
+                        items.add(meethiBiryani);
+
+                        // --- Signature Starters and Sides ---
+                        items.add(new MenuItem(null, "Chettinad Chicken 65", "Fiery and flavorful South Indian delight",
+                                        129.0, "Signature Starters and Sides", null, true, biryaniImg, 5.0, 15, false,
+                                        12, false, 0.0));
+                        items.add(new MenuItem(null, "Mughlai Chicken Tikka",
+                                        "Grilled to perfection with yogurt and herbs", 159.0,
+                                        "Signature Starters and Sides", null, true, biryaniImg, 5.0, 15, false, 13,
+                                        false, 0.0));
+                        items.add(new MenuItem(null, "Hara Bhara Paneer Thalicha",
+                                        "Soft paneer tossed in tangy green thalicha", 119.0,
+                                        "Signature Starters and Sides", null, true, biryaniImg, 5.0, 15, true, 14,
+                                        false, 0.0));
+                        items.add(new MenuItem(null, "Chicken 65", "Spicy deep fried chicken chunks", 240.0,
+                                        "Signature Starters and Sides", null, true, biryaniImg, 5.0, 15, false, 15,
+                                        false, 0.0));
+                        items.add(new MenuItem(null, "Chilli Chicken", "Indo-Chinese style spicy chicken", 240.0,
+                                        "Signature Starters and Sides", null, true, biryaniImg, 5.0, 15, false, 16,
+                                        false, 0.0));
+                        items.add(new MenuItem(null, "Paneer Tikka", "Grilled cottage cheese marinated in yogurt",
+                                        220.0, "Signature Starters and Sides", null, true, biryaniImg, 5.0, 15, true,
+                                        17, false, 0.0));
+                        items.add(new MenuItem(null, "Gobi Manchurian", "Cauliflower florets in tangy sauce", 180.0,
+                                        "Signature Starters and Sides", null, true, biryaniImg, 5.0, 15, true, 18,
+                                        false, 0.0));
+                        items.add(new MenuItem(null, "King Fish Fry", "Tawa fried marinated fish", 299.0,
+                                        "Signature Starters and Sides", null, true, biryaniImg, 5.0, 20, false, 19,
+                                        false, 0.0));
+
+                        // --- Drinks and Refreshments ---
+                        items.add(new MenuItem(null, "Coke (250ml)", "Carbonated soft drink", 40.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 1, true, 20, true,
+                                        50.0));
+                        items.add(new MenuItem(null, "Sprite (250ml)", "Carbonated soft drink", 40.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 1, true, 21, true,
+                                        50.0));
+                        items.add(new MenuItem(null, "Thums Up (250ml)", "Carbonated soft drink", 40.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 1, true, 22, true,
+                                        50.0));
+                        items.add(new MenuItem(null, "Coke (600ml)", "Carbonated soft drink", 70.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 1, true, 23, true,
+                                        10.0));
+                        items.add(new MenuItem(null, "Sprite (600ml)", "Carbonated soft drink", 70.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 1, true, 24, true,
+                                        10.0));
+                        items.add(new MenuItem(null, "Water Bottle (1L)", "Packaged drinking water", 20.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 1, true, 25, true,
+                                        100.0));
+                        items.add(new MenuItem(null, "Sweet Lassi", "Traditional yogurt churned drink", 80.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 5, true, 26, false,
+                                        0.0));
+                        items.add(new MenuItem(null, "Mango Lassi", "Yogurt drink with mango pulp", 100.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 5, true, 27, false,
+                                        0.0));
+
+                        // --- Desserts ---
+                        items.add(new MenuItem(null, "Gulab Jamun (2 pcs)", "Soft milk solids in sugar syrup", 80.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 2, true, 28, false,
+                                        0.0));
+                        items.add(new MenuItem(null, "Double Ka Meetha", "Bread pudding with dry fruits", 100.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 5, true, 29, false,
+                                        0.0));
+                        items.add(new MenuItem(null, "Vanilla Ice Cream", "Classic vanilla cold dessert", 60.0,
+                                        "Drinks and Refreshments", null, true, biryaniImg, 5.0, 2, true, 30, false,
+                                        0.0));
 
                         if (!items.isEmpty()) {
                                 menuItemRepository.saveAll(items);
-                        }
-                } else {
-                        // Update any existing items that don't have an image
-                        List<MenuItem> existingItems = menuItemRepository.findAll();
-                        boolean anyUpdate = false;
-                        if (existingItems != null) {
-                                for (MenuItem item : existingItems) {
-                                        if (item.getImageUrl() == null || item.getImageUrl().isEmpty()) {
-                                                item.setImageUrl(DEFAULT_IMAGE);
-                                                anyUpdate = true;
-                                        }
-                                }
-                                if (anyUpdate) {
-                                        menuItemRepository.saveAll(existingItems);
-                                }
                         }
                 }
         }

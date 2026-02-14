@@ -13,6 +13,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.biryanipos.backend.constant.AppConstants;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,16 +49,13 @@ public class OrderService {
       throw new RuntimeException("Items list is required");
     }
 
+    // FIRST: Validate all stock availability before deducting any
     for (OrderItemRequest itemRequest : request.getItems()) {
       if (itemRequest.getMenuItemId() == null) {
         throw new RuntimeException("Menu item ID is required");
       }
-      MenuItem menuItem = menuItemRepository.findById(java.util.Objects.requireNonNull(itemRequest.getMenuItemId()))
+      MenuItem menuItem = menuItemRepository.findById(itemRequest.getMenuItemId())
           .orElseThrow(() -> new RuntimeException("Menu item not found: " + itemRequest.getMenuItemId()));
-
-      if (!menuItem.isAvailable()) {
-        throw new RuntimeException("Menu item not available: " + menuItem.getName());
-      }
 
       MenuItemVariation variation = null;
       if (itemRequest.getVariationId() != null) {
@@ -66,7 +65,39 @@ public class OrderService {
             .orElseThrow(() -> new RuntimeException("Variation not found"));
       }
 
-      // Deduct stock if tracking is enabled
+      // Validate direct stock
+      double multiplier = (variation != null) ? variation.getStockMultiplier() : 1.0;
+      if (menuItem.isTrackStock()) {
+        double required = itemRequest.getQuantity() * multiplier;
+        if (menuItem.getStockLevel() < required) {
+          throw new RuntimeException("Insufficient stock: " + menuItem.getName());
+        }
+      }
+
+      // Validate recipe ingredients
+      if (menuItem.getIngredients() != null) {
+        for (MenuItemIngredient ing : menuItem.getIngredients()) {
+          double needed = ing.getQuantity() * itemRequest.getQuantity() * multiplier;
+          if (ing.getStockItem().getCurrentStock() < needed) {
+            throw new RuntimeException("Insufficient " + ing.getStockItem().getName());
+          }
+        }
+      }
+    }
+
+    // THEN: Proceed with order creation and actual deduction
+    for (OrderItemRequest itemRequest : request.getItems()) {
+      MenuItem menuItem = menuItemRepository.findById(itemRequest.getMenuItemId()).orElseThrow();
+
+      MenuItemVariation variation = null;
+      if (itemRequest.getVariationId() != null) {
+        variation = menuItem.getVariations().stream()
+            .filter(v -> v.getId().equals(itemRequest.getVariationId()))
+            .findFirst()
+            .orElse(null);
+      }
+
+      // Deduct stock (now safe because we validated everything)
       deductStock(menuItem, variation, itemRequest.getQuantity());
 
       OrderItem orderItem = new OrderItem();
@@ -83,15 +114,16 @@ public class OrderService {
       orderItem.setOrder(order);
 
       subtotal += itemPrice * itemRequest.getQuantity();
-      int prepTime = menuItem.getPrepTimeMinutes() > 0 ? menuItem.getPrepTimeMinutes() : 10;
+      int prepTime = menuItem.getPrepTimeMinutes() > 0 ? menuItem.getPrepTimeMinutes()
+          : AppConstants.DEFAULT_PREP_TIME_MINUTES;
       if (prepTime > maxPrepTime)
         maxPrepTime = prepTime;
 
       orderItems.add(orderItem);
     }
 
-    if (maxPrepTime < 10)
-      maxPrepTime = 10;
+    if (maxPrepTime < AppConstants.DEFAULT_PREP_TIME_MINUTES)
+      maxPrepTime = AppConstants.DEFAULT_PREP_TIME_MINUTES;
     order.setEstimatedReadyTime(LocalDateTime.now().plusMinutes(maxPrepTime));
 
     order.setItems(orderItems);

@@ -6,6 +6,8 @@ import { getOrders, getActiveOrders, processPayment, getBill, updateOrderStatus,
 import { connectWebSocket } from '../service/ws';
 import { useAuth } from '../context/AuthContext';
 import ThermalReceipt from '../components/ThermalReceipt';
+import { addPendingSync } from '../db';
+import { shopConfig } from '../config/shopConfig';
 import './CounterPage.css';
 
 function CounterPage() {
@@ -140,7 +142,24 @@ function CounterPage() {
       setView('pending');
       loadOrders();
     } catch (err) {
-      alert('❌ Payment failed: ' + (err.response?.data?.message || err.message));
+      if (!navigator.onLine || err.code === 'ERR_NETWORK') {
+        const paymentData = {
+          orderId: selectedOrder.id,
+          discount: parseFloat(discount) || 0,
+          transactionRef: '',
+          paymentModes: isMultiPay ? addedPayments : undefined,
+          paymentMode: isMultiPay ? undefined : paymentMode,
+          amountReceived: isMultiPay ? addedPayments.reduce((sum, p) => sum + p.amount, 0) : (parseFloat(amountReceived) || 0)
+        };
+        await addPendingSync('PROCESS_PAYMENT', paymentData);
+        alert('📡 Network error: Payment saved LOCALLY. It will sync automatically when online.');
+
+        setSelectedOrder(null);
+        setBillData(null);
+        setView('pending');
+      } else {
+        alert('❌ Payment failed: ' + (err.response?.data?.message || err.message));
+      }
     }
     setLoading(false);
   };
@@ -176,7 +195,29 @@ function CounterPage() {
       // Auto-select for billing
       selectForBilling(res.data);
     } catch (err) {
-      alert('❌ Failed to create takeaway order: ' + (err.response?.data?.message || err.message));
+      if (!navigator.onLine || err.code === 'ERR_NETWORK') {
+        const orderData = {
+          customerName,
+          customerPhone,
+          tableNumber: 'TAKEAWAY',
+          orderType: 'TAKEAWAY',
+          createdBy: 'Cashier',
+          items: Object.values(cart).map(c => ({
+            menuItemId: c.item.id,
+            variationId: c.variation ? c.variation.id : null,
+            quantity: c.qty
+          }))
+        };
+        await addPendingSync('CREATE_ORDER', orderData);
+        alert('📡 Network error: Takeaway order saved LOCALLY. It will sync automatically when online.');
+
+        setCart({});
+        setCustomerName('');
+        setCustomerPhone('');
+        setView('pending');
+      } else {
+        alert('❌ Failed to create takeaway order: ' + (err.response?.data?.message || err.message));
+      }
     }
     setLoading(false);
   };
@@ -254,7 +295,7 @@ function CounterPage() {
     if (parseFloat(discount) > 0) {
       doc.text(`Discount: -INR ${parseFloat(discount).toFixed(2)}`, 70, finalY + 12, { align: 'right' });
     }
-    doc.text(`GST (5%): INR ${(calc.cgst + calc.sgst).toFixed(2)}`, 70, finalY + 16, { align: 'right' });
+    doc.text(`GST (${shopConfig.gstPercentage}%): INR ${(calc.cgst + calc.sgst).toFixed(2)}`, 70, finalY + 16, { align: 'right' });
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text(`TOTAL: INR ${calc.total.toFixed(2)}`, 70, finalY + 22, { align: 'right' });
@@ -296,7 +337,7 @@ function CounterPage() {
     let totalSgst = 0;
 
     billData.items?.forEach(item => {
-      const itemGst = item.gstPercent || 5.0;
+      const itemGst = item.gstPercent || shopConfig.gstPercentage;
       const itemTax = (item.total * (itemGst / 100));
       totalCgst += itemTax / 2;
       totalSgst += itemTax / 2;
@@ -498,8 +539,8 @@ function CounterPage() {
                   {parseFloat(discount) > 0 && (
                     <div className="bill-row discount"><span>Discount</span><span>-₹{parseFloat(discount).toFixed(2)}</span></div>
                   )}
-                  <div className="bill-row"><span>CGST (2.5%)</span><span>₹{calc.cgst?.toFixed(2)}</span></div>
-                  <div className="bill-row"><span>SGST (2.5%)</span><span>₹{calc.sgst?.toFixed(2)}</span></div>
+                  <div className="bill-row"><span>CGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.cgst?.toFixed(2)}</span></div>
+                  <div className="bill-row"><span>SGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.sgst?.toFixed(2)}</span></div>
                   <div className="bill-row bill-grand-total">
                     <span>Grand Total</span>
                     <span>₹{calc.total?.toFixed(2)}</span>

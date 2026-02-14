@@ -17,27 +17,16 @@ import {
 } from '../service/api';
 import { connectWebSocket } from '../service/ws';
 import { useAuth } from '../context/AuthContext';
+import LoadingOverlay from '../components/LoadingOverlay';
+import Modal from '../components/Modal';
 import './ManagerPage.css';
 
-const Modal = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content animate-slideUp" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h4>{title}</h4>
-          <button className="modal-close" onClick={onClose}>&times;</button>
-        </div>
-        <div className="modal-body">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-};
+// Local Modal component removed - using shared component
+
 
 function ManagerPage() {
   const { logout, user } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboard, setDashboard] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
@@ -68,7 +57,7 @@ function ManagerPage() {
 
   // Forms
   const [newItem, setNewItem] = useState({
-    name: '', description: '', price: '', category: 'Biryani',
+    name: '', description: '', price: '', category: 'Royal Biryani Selection',
     imageUrl: '', vegetarian: false, prepTimeMinutes: 15,
     variations: [], trackStock: false, stockLevel: 0
   });
@@ -110,19 +99,24 @@ function ManagerPage() {
   }, [activeTab, dateRange]);
 
   const loadDashboard = async () => {
+    setLoading(true);
     try {
       const res = await getDashboard();
       setDashboard(res.data);
     } catch (err) { console.error(err); }
+    setLoading(false);
   };
 
   const loadMenu = async () => {
+    setLoading(true);
     const [menuRes, catRes] = await Promise.all([getMenuItems(), getCategories()]);
     setMenuItems(menuRes.data);
     setCategories(catRes.data);
+    setLoading(false);
   };
 
   const loadStock = async () => {
+    setLoading(true);
     const [stockRes, lowRes, wasteRes, expiringRes] = await Promise.all([
       getStockItems(), getLowStockItems(), getWasteTransactions(), getExpiringStockItems(7)
     ]);
@@ -130,9 +124,11 @@ function ManagerPage() {
     setLowStock(lowRes.data);
     setWasteData(wasteRes.data);
     setExpiringStock(expiringRes.data);
+    setLoading(false);
   };
 
   const loadExpenses = async (supplierId) => {
+    setLoading(true);
     let expRes;
     if (supplierId) {
       expRes = await getExpensesBySupplier(supplierId);
@@ -142,11 +138,14 @@ function ManagerPage() {
     const supRes = await getAllSuppliers();
     setExpenses(expRes.data);
     setSuppliers(supRes.data);
+    setLoading(false);
   };
 
   const loadTables = async () => {
+    setLoading(true);
     const res = await getTables();
     setTables(res.data);
+    setLoading(false);
   };
 
   const loadUsers = async () => {
@@ -273,8 +272,14 @@ function ManagerPage() {
 
   const handleEditRecipe = (rc) => {
     setEditingRecipeId(rc.menuItemId);
+    // Create deep copy to avoid mutation
     setEditRecipeIngredients(
-      rc.ingredients.map(ing => ({ stockItemId: ing.stockItemId, quantity: ing.quantity, name: ing.name, unit: ing.unit }))
+      rc.ingredients.map(ing => ({
+        stockItemId: ing.stockItemId,
+        quantity: ing.quantity,
+        name: ing.name,
+        unit: ing.unit
+      }))
     );
   };
 
@@ -345,7 +350,7 @@ function ManagerPage() {
         await createMenuItem(itemData);
       }
 
-      setNewItem({ name: '', description: '', price: '', category: 'Biryani', imageUrl: '', vegetarian: false, prepTimeMinutes: 15, variations: [] });
+      setNewItem({ name: '', description: '', price: '', category: 'Royal Biryani Selection', imageUrl: '', vegetarian: false, prepTimeMinutes: 15, variations: [] });
       setEditingItemId(null);
       setShowForm('');
       loadMenu();
@@ -376,6 +381,16 @@ function ManagerPage() {
     if (!confirm('Delete this item?')) return;
     await deleteMenuItem(id);
     loadMenu();
+  };
+
+  const handleDeleteExpense = async (id) => {
+    if (!confirm('Delete this expense?')) return;
+    try {
+      await deleteExpense(id);
+      loadExpenses(selectedSupplier);
+    } catch (err) {
+      alert('Failed to delete expense');
+    }
   };
 
   const handleAddExpense = async () => {
@@ -1565,6 +1580,7 @@ function ManagerPage() {
           )
         }
       </main >
+      {loading && <LoadingOverlay />}
     </div >
   );
 }

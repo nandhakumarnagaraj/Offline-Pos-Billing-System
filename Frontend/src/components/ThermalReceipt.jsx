@@ -1,115 +1,190 @@
 import React from 'react';
 import './ThermalReceipt.css';
+import { shopConfig } from '../config/shopConfig';
 
-const ThermalReceipt = ({ billData, calc, storeName = "BIRYANIPOS RESTAURANT" }) => {
+const ThermalReceipt = ({ billData, calc }) => {
   if (!billData) return null;
 
-  const today = new Date().toLocaleDateString('en-IN', {
+  const today = new Date().toLocaleDateString('en-GB', {
     day: '2-digit',
-    month: '2-digit',
+    month: 'short',
     year: 'numeric',
-  });
+  }).replace(/ /g, '-');
+
   const time = new Date().toLocaleTimeString('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hour12: true,
   });
+
+  const savings = (parseFloat(calc.discount) || 0);
+
+  const numberToWords = (num) => {
+    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    const convert = (n) => {
+      if (n < 20) return a[n];
+      if (n < 100) return b[Math.floor(n / 10)] + (n % 10 !== 0 ? '-' + a[n % 10] : '');
+      if (n < 1000) return a[Math.floor(n / 100)] + 'Hundred ' + (n % 100 !== 0 ? 'and ' + convert(n % 100) : '');
+      if (n < 100000) return convert(Math.floor(n / 1000)) + 'Thousand ' + (n % 1000 !== 0 ? convert(n % 1000) : '');
+      if (n < 10000000) return convert(Math.floor(n / 100000)) + 'Lakh ' + (n % 100000 !== 0 ? convert(n % 100000) : '');
+      return 'Big Number';
+    };
+
+    const whole = Math.floor(num);
+    return convert(whole) + 'Rupees Only';
+  };
+
+  const amountInWords = calc.totalInWords || numberToWords(calc.total);
 
   return (
     <div className="thermal-receipt-wrap">
       <div className="thermal-receipt" id="thermal-receipt">
-        <div className="receipt-header">
-          <h1 className="store-name">{storeName}</h1>
-          <p className="store-tagline">Delicious Hyderabadi Flavours</p>
-          <p className="store-fssai">FSSAI: 12345678901234</p>
-          <div className="receipt-divider">********************************</div>
-        </div>
+        {/* === HEADER SECTION === */}
+        <header className="receipt-header">
+          <div className="receipt-logo">
+            <img src={shopConfig.logo} alt="Store Logo" className="logo-img" />
+          </div>
+          <h1 className="store-name">{shopConfig.name}</h1>
+          <div className="store-details">
+            {shopConfig.address.map((line, i) => (
+              <p key={i} className="store-address">{line}</p>
+            ))}
+            {/* <p className="store-gstin">GSTIN: {shopConfig.gstin}</p> */}
+            <p className="store-fssai">FSSAI: {shopConfig.fssai}</p>
+          </div>
+          <div className="divider-double"></div>
+          <h2 className="invoice-title">TAX INVOICE</h2>
+          <div className="divider-dashed"></div>
+        </header>
 
-        <div className="receipt-info">
-          <div className="info-row">
-            <span>Date: {today}</span>
-            <span>Time: {time}</span>
+        {/* === INFO SECTION === */}
+        <section className="bill-info">
+          <div className="info-grid">
+            <div className="info-item">
+              <span className="label">Bill No:</span>
+              <span className="value">{billData.orderId}</span>
+            </div>
+            <div className="info-item text-right">
+              <span className="label">Counter:</span>
+              <span className="value">01</span>
+            </div>
+            <div className="info-item">
+              <span className="label">Date:</span>
+              <span className="value">{today}</span>
+            </div>
+            <div className="info-item text-right">
+              <span className="label">Time:</span>
+              <span className="value">{time}</span>
+            </div>
           </div>
-          <div className="info-row">
-            <span>Bill No: {billData.orderId}</span>
-            <span>Table: {billData.tableNumber || 'Takeaway'}</span>
+        </section>
+
+        <div className="divider-solid"></div>
+
+        {/* === ITEMS SECTION === */}
+        <table className="items-table">
+          <thead>
+            <tr>
+              <th className="col-sl">SL</th>
+              <th className="col-item">DESCRIPTION</th>
+              <th className="col-qty">QTY</th>
+              <th className="col-price">PRICE</th>
+              <th className="col-amount">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {billData.items?.map((item, idx) => (
+              <tr key={idx} className="item-row">
+                <td className="col-sl">{idx + 1}</td>
+                <td className="col-item">
+                  <div className="item-name">{item.name}</div>
+                  {item.mrp > item.unitPrice && (
+                    <div className="item-mrp-savings">MRP: {item.mrp.toFixed(2)}</div>
+                  )}
+                </td>
+                <td className="col-qty">{item.quantity}</td>
+                <td className="col-price">{item.unitPrice.toFixed(2)}</td>
+                <td className="col-amount">{item.total.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="divider-dashed"></div>
+
+        {/* === TOTALS SECTION === */}
+        <section className="totals-section">
+          <div className="total-row">
+            <span>Sub-Total ({billData.items?.length} Items)</span>
+            <span>{billData.subtotal.toFixed(2)}</span>
           </div>
-          {billData.customerName && (
-            <div className="info-row">
-              <span>Customer: {billData.customerName}</span>
+          {savings > 0 && (
+            <div className="total-row discount">
+              <span>Savings & Discount</span>
+              <span>- {savings.toFixed(2)}</span>
             </div>
           )}
-        </div>
-
-        <div className="receipt-divider">--------------------------------</div>
-
-        <div className="receipt-items">
-          <div className="item-header">
-            <span className="col-name">ITEM</span>
-            <span className="col-qty">QTY</span>
-            <span className="col-price">PRICE</span>
-            <span className="col-total">TOTAL</span>
-          </div>
-          <div className="receipt-divider">--------------------------------</div>
-
-          {billData.items?.map((item, idx) => (
-            <div key={idx} className="item-row">
-              <span className="col-name">{item.name}</span>
-              <span className="col-qty">{item.quantity}</span>
-              <span className="col-price">{item.unitPrice.toFixed(0)}</span>
-              <span className="col-total">{item.total.toFixed(0)}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="receipt-divider">--------------------------------</div>
-
-        <div className="receipt-totals">
-          <div className="total-row">
-            <span>Subtotal:</span>
-            <span>₹{billData.subtotal.toFixed(2)}</span>
-          </div>
-          {calc.discount > 0 && (
-            <div className="total-row">
-              <span>Discount:</span>
-              <span>-₹{calc.discount.toFixed(2)}</span>
-            </div>
-          )}
-          <div className="total-row">
-            <span>CGST (2.5%):</span>
-            <span>₹{calc.cgst.toFixed(2)}</span>
-          </div>
-          <div className="total-row">
-            <span>SGST (2.5%):</span>
-            <span>₹{calc.sgst.toFixed(2)}</span>
-          </div>
-          <div className="receipt-divider">--------------------------------</div>
+          <div className="divider-dashed"></div>
           <div className="total-row grand-total">
-            <span>GRAND TOTAL:</span>
-            <span>₹{calc.total.toFixed(2)}</span>
+            <span>NET AMOUNT</span>
+            <span className="grand-total-val">₹ {calc.total.toFixed(2)}</span>
           </div>
-          <div className="receipt-divider">--------------------------------</div>
+          <div className="divider-double"></div>
 
-          {calc.change > 0 && (
-            <>
-              <div className="total-row">
-                <span>Received:</span>
-                <span>₹{(calc.total + calc.change).toFixed(2)}</span>
-              </div>
-              <div className="total-row">
-                <span>Change:</span>
-                <span>₹{calc.change.toFixed(2)}</span>
-              </div>
-            </>
-          )}
-        </div>
+          <div className="amount-in-words">
+            <p>Total Amount in Words: {amountInWords}</p>
+          </div>
+        </section>
 
-        <div className="receipt-footer">
-          <p>Thank You! Visit Again</p>
-          <p className="footer-small">For Feedback: +91 98765 43210</p>
-          <div className="receipt-divider">********************************</div>
-          <p className="software-credit">Powered by BiryaniPOS</p>
-        </div>
+        {/* === TAX SECTION === */}
+        <section className="tax-summary">
+          <table className="tax-table">
+            <thead>
+              <tr>
+                <th>GST%</th>
+                <th>Taxable</th>
+                <th>CGST</th>
+                <th>SGST</th>
+                <th>Tot.Tax</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{shopConfig.gstPercentage}%</td>
+                <td>{calc.sub?.toFixed(2)}</td>
+                <td>{calc.cgst.toFixed(2)}</td>
+                <td>{calc.sgst.toFixed(2)}</td>
+                <td>{(calc.cgst + calc.sgst).toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        {/* === FOOTER SECTION === */}
+        <footer className="receipt-footer">
+          <div className="savings-highlight">
+            {savings > 0 ? (
+              <p>YOU SAVED ₹{savings.toFixed(2)} ON THIS BILL!</p>
+            ) : (
+              <p>THANK YOU FOR SHOPPING WITH US</p>
+            )}
+          </div>
+
+          <div className="store-social">
+            <p className="whatsapp-link">WhatsApp: {shopConfig.contact.whatsapp}</p>
+            <p>{shopConfig.tagline}</p>
+          </div>
+
+          <div className="divider-dashed"></div>
+
+          <div className="footer-message">
+            <p className="thanks">{shopConfig.footerMessage}</p>
+            <p className="copyright">Software by {shopConfig.softwareBy}</p>
+          </div>
+        </footer>
       </div>
     </div>
   );

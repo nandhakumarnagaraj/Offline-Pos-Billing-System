@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { getUnsyncedOrders, markOrderSynced } from '../db';
-import { createOrder } from '../service/api';
+import { getPendingSyncs, removePendingSync } from '../db';
+import { createOrder, processPayment } from '../service/api';
 
 const SyncManager = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncing, setSyncing] = useState(false);
-  const [unsyncedCount, setUnsyncedCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -15,14 +15,14 @@ const SyncManager = () => {
     window.addEventListener('offline', handleOffline);
 
     // Initial check
-    updateUnsyncedCount();
+    updatePendingCount();
 
     // Interval sync
     const interval = setInterval(() => {
       if (isOnline && !syncing) {
-        syncOrders();
+        syncAllData();
       }
-      updateUnsyncedCount();
+      updatePendingCount();
     }, 10000); // Check every 10 seconds
 
     return () => {
@@ -32,38 +32,40 @@ const SyncManager = () => {
     };
   }, [isOnline, syncing]);
 
-  const updateUnsyncedCount = async () => {
-    const orders = await getUnsyncedOrders();
-    setUnsyncedCount(orders.length);
+  const updatePendingCount = async () => {
+    const pending = await getPendingSyncs();
+    setPendingCount(pending.length);
   };
 
-  const syncOrders = async () => {
-    const orders = await getUnsyncedOrders();
-    if (orders.length === 0) return;
+  const syncAllData = async () => {
+    const pending = await getPendingSyncs();
+    if (pending.length === 0) return;
 
     setSyncing(true);
-    console.log(`🔄 Syncing ${orders.length} offline orders...`);
+    console.log(`🔄 Syncing ${pending.length} pending actions...`);
 
-    for (const offlineOrder of orders) {
+    for (const action of pending) {
       try {
-        // Remove the internal DB fields before sending to API
-        const { id, synced, createdAt, ...orderData } = offlineOrder;
+        if (action.type === 'CREATE_ORDER') {
+          await createOrder(action.data);
+        } else if (action.type === 'PROCESS_PAYMENT') {
+          await processPayment(action.data);
+        }
 
-        await createOrder(orderData);
-        await markOrderSynced(offlineOrder.id);
-        console.log(`✅ Order #${offlineOrder.id} synced successfully.`);
+        await removePendingSync(action.id);
+        console.log(`✅ ${action.type} synced successfully.`);
       } catch (err) {
-        console.error(`❌ Failed to sync order #${offlineOrder.id}:`, err);
+        console.error(`❌ Failed to sync ${action.type}:`, err);
         // If it's a server error but we're online, we might want to stop sync to avoid spamming
         break;
       }
     }
 
     setSyncing(false);
-    updateUnsyncedCount();
+    updatePendingCount();
   };
 
-  if (unsyncedCount === 0 && isOnline) return null;
+  if (pendingCount === 0 && isOnline) return null;
 
   return (
     <div className={`sync-status-bar ${!isOnline ? 'offline' : 'syncing'}`}>
@@ -71,12 +73,12 @@ const SyncManager = () => {
         {!isOnline ? (
           <>
             <span className="sync-icon">📡</span>
-            <span>Offline Mode: Orders are being saved locally ({unsyncedCount} pending)</span>
+            <span>Offline Mode: Data saved locally ({pendingCount} pending)</span>
           </>
         ) : (
           <>
             <span className="sync-icon animate-spin">🔄</span>
-            <span>Syncing {unsyncedCount} pending orders to server...</span>
+            <span>Syncing {pendingCount} pending actions to server...</span>
           </>
         )}
       </div>
