@@ -89,10 +89,28 @@
 }
 
 @media (max-width: 480px) {
+  .login-container {
+    padding: 16px;
+    align-items: flex-start;
+    padding-top: 60px;
+  }
+
   .login-card {
-    padding: 30px;
-    border: none;
-    box-shadow: none;
-    background: transparent;
+    padding: 24px;
+    max-width: 100%;
+    border-radius: var(--radius);
+  }
+
+  .login-logo {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+  }
+
+  .login-brand h1 {
+    font-size: 1.8rem;
+  }
+
+  .login-brand p {
+    font-size: 0.9rem;
   }
 }

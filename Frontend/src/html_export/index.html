@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home - Offline PoS</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .home-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px;
+    }
+
+    .brand-section {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .brand-logo {
+      font-size: 4rem;
+      margin-bottom: 10px;
+      display: inline-block;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .brand-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -1px;
+    }
+
+    .brand-subtitle {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+      margin-top: 8px;
+    }
+
+    .nav-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      width: 100%;
+      max-width: 1000px;
+      margin-bottom: 40px;
+    }
+
+    .nav-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      text-decoration: none;
+    }
+
+    .nav-card:hover {
+      transform: translateY(-8px);
+      border-color: var(--primary);
+      box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
+    }
+
+    .nav-icon {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+      transition: transform 0.3s;
+    }
+
+    .nav-card:hover .nav-icon {
+      transform: scale(1.1);
+    }
+
+    .nav-card h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .nav-card p {
+      margin-top: 8px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    @keyframes float {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="home-container animate-fadeIn">
+    <div class="brand-section">
+      <div class="brand-logo">🔥</div>
+      <h1 class="brand-title">Biryani PoS</h1>
+      <p class="brand-subtitle">Smart Billing & Kitchen Management System</p>
+    </div>
+
+    <div class="nav-grid">
+      <a href="waiter.html" class="nav-card">
+        <div class="nav-icon">🍽️</div>
+        <h2>Waiter</h2>
+        <p>Manage Tables & Orders</p>
+      </a>
+
+      <a href="kitchen.html" class="nav-card">
+        <div class="nav-icon">👨‍🍳</div>
+        <h2>Kitchen</h2>
+        <p>KDS Display System</p>
+      </a>
+
+      <a href="counter.html" class="nav-card">
+        <div class="nav-icon">🖥️</div>
+        <h2>Counter</h2>
+        <p>Billing & Takeaway</p>
+      </a>
+
+      <a href="manager.html" class="nav-card">
+        <div class="nav-icon">📊</div>
+        <h2>Manager</h2>
+        <p>Reports & Settings</p>
+      </a>
+    </div>
+
+    <footer class="text-center text-sm text-muted">
+      <p>&copy; 2026 Offline PoS System. All rights reserved.</p>
+    </footer>
+  </div>
+</body>
+
+</html>

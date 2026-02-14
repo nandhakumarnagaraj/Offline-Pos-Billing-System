@@ -47,6 +47,7 @@ com\biryanipos\backend\config\SecurityConfig.class
 com\biryanipos\backend\model\Expense.class
 com\biryanipos\backend\config\WebSocketConfig.class
 com\biryanipos\backend\security\JwtUtil.class
+com\biryanipos\backend\service\ConfigurationService.class
 com\biryanipos\backend\dto\ExpenseRequest.class
 com\biryanipos\backend\service\PrintingService.class
 com\biryanipos\backend\dto\OrderResponseDTO.class
@@ -57,6 +58,7 @@ com\biryanipos\backend\model\PaymentDetail.class
 com\biryanipos\backend\service\AuthService.class
 com\biryanipos\backend\service\ExpenseService.class
 com\biryanipos\backend\service\StockService$1.class
+com\biryanipos\backend\model\AppConfig.class
 com\biryanipos\backend\model\StockItem.class
 com\biryanipos\backend\repository\ShiftRepository.class
 com\biryanipos\backend\dto\RecipeCostingDto.class

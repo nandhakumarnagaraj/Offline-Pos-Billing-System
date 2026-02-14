@@ -543,28 +543,7 @@ function ManagerPage() {
               </div>
             )}
             <h2>Dashboard</h2>
-            <div className="dash-cards">
-              <div className="dash-card dc-revenue">
-                <div className="dc-label">Today's Revenue</div>
-                <div className="dc-value">₹{dashboard.todayRevenue?.toFixed(0)}</div>
-              </div>
-              <div className="dash-card dc-orders">
-                <div className="dc-label">Today's Orders</div>
-                <div className="dc-value">{dashboard.todayOrders}</div>
-              </div>
-              <div className="dash-card dc-active">
-                <div className="dc-label">Active Orders</div>
-                <div className="dc-value">{dashboard.activeOrders}</div>
-              </div>
-              <div className="dash-card dc-expenses">
-                <div className="dc-label">Today's Expenses</div>
-                <div className="dc-value">₹{dashboard.todayExpenses?.toFixed(0)}</div>
-              </div>
-              <div className="dash-card dc-waste" style={{ background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', color: '#721c24' }}>
-                <div className="dc-label">Today's Wastage</div>
-                <div className="dc-value">₹{dashboard.totalWastageValue?.toFixed(0)}</div>
-              </div>
-            </div>
+
 
             {dashboard.lowStockCount > 0 && (
               <div className="alert-banner">⚠️ {dashboard.lowStockCount} items are low on stock!</div>

@@ -128,6 +128,13 @@ function WaiterPage() {
     setView('menu');
   };
 
+  const editOrder = (order) => {
+    setSelectedTable(order.tableNumber);
+    setCustomerName(order.customerName || '');
+    setCustomerPhone(order.customerPhone || '');
+    setView('menu');
+  };
+
   const submitOrder = async () => {
     if (orderType === 'DINE_IN' && !selectedTable) {
       alert('Please select a table first.');
@@ -416,8 +423,29 @@ function WaiterPage() {
                 </div>
 
                 <div className="cart-list-c">
+                  {/* Existing KDS Items */}
+                  {activeOrders.find(o => o.tableNumber === selectedTable && o.status !== 'PAID' && o.status !== 'CANCELLED')?.items?.length > 0 && (
+                    <div className="existing-items-section">
+                      <div className="section-label" style={{ padding: '8px 4px', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                        🔥 In Kitchen (KDS)
+                      </div>
+                      {activeOrders.find(o => o.tableNumber === selectedTable && o.status !== 'PAID' && o.status !== 'CANCELLED').items.map(item => (
+                        <div key={'existing-' + item.id} className="cart-item-c existing-kds-item" style={{ borderLeft: '3px solid var(--warning)', background: 'rgba(245, 158, 11, 0.1)' }}>
+                          <div className="item-details-c">
+                            <span className="item-name-c">{item.menuItem?.name} <small style={{ opacity: 0.7 }}>(Saved)</small></span>
+                            <div className="item-qty-c">
+                              <span style={{ fontWeight: 'bold' }}>{item.quantity}x</span>
+                            </div>
+                          </div>
+                          <span className="item-total-c">₹{(item.price * item.quantity).toFixed(0)}</span>
+                        </div>
+                      ))}
+                      <div className="divider" style={{ borderBottom: '1px dashed var(--border)', margin: '12px 0' }}></div>
+                    </div>
+                  )}
+
                   {Object.keys(cart).length === 0 ? (
-                    <div className="empty-cart-c">Cart is empty</div>
+                    <div className="empty-cart-c">Add new items...</div>
                   ) : (
                     Object.entries(cart).map(([key, c]) => (
                       <div key={key} className="cart-item-c">
@@ -458,7 +486,7 @@ function WaiterPage() {
             )}
             <div className="orders-grid-modern">
               {activeOrders.map(order => (
-                <div key={order.id} className={`modern-order-card status-${order.status?.toLowerCase()}`} onClick={() => selectForBilling(order)}>
+                <div key={order.id} className={`modern-order-card status-${order.status?.toLowerCase()}`} onClick={() => editOrder(order)}>
                   <div className="m-order-header">
                     <div className="m-order-id-group">
                       <span className="m-order-id">{order.id}</span>

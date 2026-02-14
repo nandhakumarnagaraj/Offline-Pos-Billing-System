@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Counter - PoS</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Similar to Menu but wider layout */
+    .counter-layout {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .counter-left {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--glass-border);
+    }
+
+    .counter-right {
+      background: var(--bg-secondary);
+      display: flex;
+      flex-direction: column;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="counter-layout animate-fadeIn">
+    <!-- Left: Menu & Orders -->
+    <div class="counter-left">
+      <header
+        style="padding: 16px; border-bottom: 1px solid var(--glass-border); display: flex; justify-content: space-between">
+        <h2>🖥️ Counter</h2>
+        <nav class="flex gap-2">
+          <button class="cat-btn active">POS</button>
+          <button class="cat-btn">History</button>
+        </nav>
+      </header>
+
+      <div style="padding: 20px; flex: 1; overflow-y: auto;">
+        <!-- Categories copied from menu.html logic -->
+        <div class="category-scroll" style="margin-bottom: 20px; display: flex; gap: 8px">
+          <button class="cat-btn active">All</button>
+          <button class="cat-btn">Starters</button>
+        </div>
+
+        <div class="menu-grid"
+          style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px;">
+          <div class="menu-item-card"
+            style="padding: 16px; border: 1px solid var(--glass-border); border-radius: 12px; text-align: center">
+            <h3>Chicken Biryani</h3>
+            <p style="color: var(--primary)">₹250</p>
+          </div>
+          <!-- More items -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Billing Cart -->
+    <div class="counter-right">
+      <div style="padding: 20px; border-bottom: 1px solid var(--glass-border)">
+        <h3>Current Bill</h3>
+        <input class="input" placeholder="Customer Name" style="margin-top: 10px">
+      </div>
+
+      <div style="flex: 1; padding: 20px; overflow-y: auto">
+        <div class="cart-item" style="display: flex; justify-content: space-between; margin-bottom: 10px">
+          <div>Chicken Biryani x1</div>
+          <div>₹250</div>
+        </div>
+      </div>
+
+      <div style="padding: 20px; background: rgba(0,0,0,0.2)">
+        <div class="flex justify-between" style="font-size: 1.5rem; font-weight: 800; margin-bottom: 16px">
+          <span>Total</span>
+          <span>₹250</span>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-outline" style="flex: 1">Cancel</button>
+          <button class="btn btn-primary" style="flex: 2">Print Bill</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

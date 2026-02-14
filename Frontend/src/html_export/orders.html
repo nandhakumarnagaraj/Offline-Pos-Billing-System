@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Waiter - Active Orders</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Styles from Step 470/455 */
+    .orders-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .order-card {
+      background: var(--bg-card);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .order-header {
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .status-preparing {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+    }
+
+    .status-ready {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+
+    .order-body {
+      padding: 16px;
+      flex: 1;
+    }
+
+    .order-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .order-footer {
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.2);
+      border-top: 1px solid var(--glass-border);
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+
+<body>
+  <header
+    style="height: 70px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+    <a href="waiter.html" class="btn btn-outline" style="margin-right: 16px">← Back</a>
+    <nav style="display: flex; gap: 10px;">
+      <a href="waiter.html" class="btn btn-outline">Tables</a>
+      <a href="menu.html" class="btn btn-outline">Menu</a>
+      <a href="#" class="btn btn-primary">Orders</a>
+    </nav>
+  </header>
+
+  <div class="container animate-fadeIn">
+    <h2 style="margin: 20px 0 10px 20px">Active Orders Tracking</h2>
+    <div class="orders-grid">
+      <!-- Order 1 -->
+      <div class="order-card" style="border-left: 4px solid var(--warning)">
+        <div class="order-header">
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-muted)">ORDER #101</div>
+            <div style="font-weight: 800; font-size: 1.1rem">Table T2</div>
+          </div>
+          <span class="status-badge status-preparing">Preparing</span>
+        </div>
+        <div class="order-body">
+          <div class="order-item">
+            <span><b>2x</b> Chicken Biryani</span>
+            <span>₹500</span>
+          </div>
+          <div class="order-item">
+            <span><b>1x</b> Coke</span>
+            <span>₹40</span>
+          </div>
+        </div>
+        <div class="order-footer">
+          <span>10:30 AM</span>
+          <span style="color: var(--success); font-weight: 700">₹540</span>
+        </div>
+      </div>
+
+      <!-- Order 2 -->
+      <div class="order-card" style="border-left: 4px solid var(--success)">
+        <div class="order-header">
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-muted)">ORDER #102</div>
+            <div style="font-weight: 800; font-size: 1.1rem">Table T4</div>
+          </div>
+          <span class="status-badge status-ready">Ready</span>
+        </div>
+        <div class="order-body">
+          <div class="order-item">
+            <span><b>1x</b> Paneer Tikka</span>
+            <span>₹220</span>
+          </div>
+        </div>
+        <div class="order-footer">
+          <span>10:45 AM</span>
+          <span style="color: var(--success); font-weight: 700">₹220</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

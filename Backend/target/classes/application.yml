@@ -49,7 +49,7 @@ app:
   security:
     jwt-secret: "KhanaBookPOS-SuperSecretKey-2024-OfflineLAN-SystemKey123456"
     jwt-expiration-ms: 86400000
-    allowed-origins: "http://localhost:5173,http://127.0.0.1:5173"
+    allowed-origins: "*"
 
 # Logging
 logging:

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Kitchen Display System</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .kds-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .kds-card {
+      background: var(--bg-card);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .kds-header {
+      padding: 12px;
+      background: rgba(255, 107, 53, 0.1);
+      border-bottom: 1px solid var(--glass-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .kds-timer {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+
+    .kds-items {
+      flex: 1;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .kds-item-row {
+      display: flex;
+      gap: 10px;
+      font-size: 1.1rem;
+      align-items: flex-start;
+    }
+
+    .kds-qty {
+      background: var(--primary);
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .kds-action {
+      margin-top: auto;
+      padding: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <header
+    style="padding: 16px 24px; background: #0f172a; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+    <div style="font-size: 1.5rem; font-weight: 800; color: #fff;">👨‍🍳 KDS <span
+        style="font-size: 1rem; opacity: 0.6; font-weight: 400">Live Orders</span></div>
+    <div style="display: flex; gap: 10px">
+      <div class="badge" style="background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 20px">Pending: 4
+      </div>
+    </div>
+  </header>
+
+  <div class="kds-grid animate-fadeIn">
+    <!-- Card 1 -->
+    <div class="kds-card">
+      <div class="kds-header">
+        <span style="font-weight: 800; color: var(--primary)">#101 - Table T2</span>
+        <span class="kds-timer">05:23</span>
+      </div>
+      <div class="kds-items">
+        <div class="kds-item-row">
+          <div class="kds-qty">2</div>
+          <div>Chicken Biryani</div>
+        </div>
+        <div class="kds-item-row">
+          <div class="kds-qty">1</div>
+          <div>Butter Naan</div>
+        </div>
+      </div>
+      <div class="kds-action">
+        <button class="btn btn-primary" style="width: 100%">Mark Ready ✅</button>
+      </div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="kds-card" style="opacity: 0.8">
+      <div class="kds-header" style="background: rgba(16, 185, 129, 0.1)">
+        <span style="font-weight: 800; color: var(--success)">#98 - Takeaway</span>
+        <span class="kds-timer">READY</span>
+      </div>
+      <div class="kds-items">
+        <div class="kds-item-row" style="text-decoration: line-through; opacity: 0.5">
+          <div class="kds-qty" style="background: gray">1</div>
+          <div>Veg Meals</div>
+        </div>
+      </div>
+      <div class="kds-action">
+        <button class="btn btn-outline" style="width: 100%">Completed</button>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

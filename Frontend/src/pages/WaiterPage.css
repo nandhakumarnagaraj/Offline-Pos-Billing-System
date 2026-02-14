@@ -393,6 +393,8 @@
   padding-right: 8px;
   align-content: start;
   padding-bottom: var(--space-md);
+  flex: 1;
+  min-height: 0;
 }
 
 .c-item-card {
@@ -557,6 +559,7 @@
   overflow-y: auto;
   margin: 5px 0 15px 0;
   padding: 10px 0;
+  min-height: 0;
 }
 
 .cart-item-c {
@@ -655,7 +658,361 @@
   margin-bottom: 5px;
 }
 
+
+/* ===== ACTIVE ORDERS - MODERN CARD DESIGN ===== */
+.orders-grid-modern {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-lg);
+  padding-bottom: var(--space-xl);
+}
+
+.modern-order-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: var(--transition);
+  cursor: pointer;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+}
+
+.modern-order-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(0, 0, 0, 0.2);
+  border-color: var(--primary);
+}
+
+.modern-order-card.status-new {
+  border-left: 4px solid var(--info);
+}
+
+.modern-order-card.status-preparing {
+  border-left: 4px solid var(--warning);
+}
+
+.modern-order-card.status-ready {
+  border-left: 4px solid var(--success);
+}
+
+.m-order-header {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.m-order-id-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.m-order-id {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.m-order-table {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.m-order-status-pill {
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.m-order-status-pill.new {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.m-order-status-pill.preparing {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.m-order-status-pill.ready {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.m-order-body {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.m-order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.m-item-qty {
+  font-weight: 700;
+  color: var(--primary);
+  width: 24px;
+}
+
+.m-item-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 8px;
+}
+
+.m-item-price {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.m-order-footer {
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.m-order-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.m-order-total {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--success);
+}
+
 /* ===== RESPONSIVE BREAKPOINTS ===== */
+
+/* ===== BILLING & PAYMENT VIEW ===== */
+.bill-view {
+  height: 100%;
+  overflow: auto;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.bill-container {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 30px;
+  height: calc(100vh - 140px);
+  padding-bottom: 20px;
+}
+
+.bill-preview {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.bill-header-sec {
+  margin-bottom: 20px;
+  border-bottom: 2px dashed var(--border);
+  padding-bottom: 16px;
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.bill-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 15px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.bill-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 30px;
+}
+
+.bill-table th {
+  text-align: left;
+  padding: 10px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+}
+
+.bill-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.bill-totals {
+  width: 300px;
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bill-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.bill-grand-total {
+  margin-top: 10px;
+  padding-top: 15px;
+  border-top: 2px solid var(--primary);
+  color: var(--text-primary);
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+
+.payment-panel {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.payment-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.payment-mode-btn {
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.payment-mode-btn.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-glow);
+}
+
+.payment-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payment-fields label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.change-display {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  padding: 20px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.multi-pay-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.payment-summary-box {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+}
+
+.add-payment-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.add-payment-row .input {
+  flex: 1;
+}
+
+.added-payments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.added-payment-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-input);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+@media (max-width: 1024px) {
+  .bill-container {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+}
+
+/* Large tablets / small laptops (≤1280px) */
 @media (max-width: 1280px) {
   .takeaway-layout {
     grid-template-columns: 1fr 380px;
@@ -666,6 +1023,7 @@
   }
 }
 
+/* Tablets (≤1024px) */
 @media (max-width: 1024px) {
   .takeaway-layout {
     grid-template-columns: 1fr;
@@ -673,22 +1031,42 @@
   }
 
   .takeaway-cart {
-    height: 400px;
+    height: auto;
+    max-height: 400px;
   }
 
   .tables-grid-modern {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
+
+  .active-orders-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
 }
 
+/* Small tablets (≤768px) */
 @media (max-width: 768px) {
+  .waiter-page {
+    height: 100vh;
+    height: 100dvh;
+  }
+
   .waiter-header {
-    padding: 0 var(--space-md);
+    height: auto;
+    padding: 10px var(--space-md);
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .header-title-group h1 {
+    font-size: 1.15rem;
   }
 
   .counter-tabs {
     overflow-x: auto;
     padding: 4px;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
   }
 
   .tab {
@@ -696,37 +1074,268 @@
     font-size: 0.75rem;
   }
 
+  .tab-count {
+    font-size: 0.65rem;
+    padding: 1px 6px;
+  }
+
+  .waiter-body {
+    padding: var(--space-md);
+    overflow-y: auto;
+  }
+
   .takeaway-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: var(--space-sm);
+    max-height: none;
+    grid-auto-rows: auto;
   }
 
   .c-item-card {
-    height: 180px;
+    height: auto;
+    min-height: 160px;
   }
 
   .c-item-img,
   .image-placeholder {
-    height: 100px;
+    height: 90px;
   }
-}
 
-@media (max-width: 640px) {
-  .waiter-body {
-    padding: var(--space-md);
+  .c-item-details {
+    padding: 8px;
+  }
+
+  .c-item-title {
+    font-size: 0.8rem;
+  }
+
+  .c-item-price {
+    font-size: 0.85rem;
+  }
+
+  .takeaway-menu {
+    padding: 16px;
+  }
+
+  .takeaway-cart {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .menu-header-c {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .search-c {
+    padding: 10px 16px;
+    font-size: 0.9rem;
+  }
+
+  .cart-item-c {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .tables-grid-modern {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: var(--space-md);
   }
 
   .modern-table-card {
-    padding: var(--space-lg);
+    padding: var(--space-md);
   }
 
   .m-table-number {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
+  }
+
+  .m-table-cap {
+    font-size: 0.75rem;
+  }
+
+  .active-orders-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-md);
+  }
+
+  .variation-options-modern {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile phones (≤480px) */
+@media (max-width: 480px) {
+  .waiter-header {
+    padding: 8px 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .counter-header-left {
+    gap: 10px;
+  }
+
+  .header-title-group h1 {
+    font-size: 1rem;
+  }
+
+  .back-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+  }
+
+  .counter-tabs {
+    justify-content: stretch;
+  }
+
+  .tab {
+    flex: 1;
+    justify-content: center;
+    padding: 7px 8px;
+    font-size: 0.7rem;
+  }
+
+  .waiter-body {
+    padding: 10px;
+  }
+
+  .tables-grid-modern {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .modern-table-card {
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius);
+  }
+
+  .m-table-number {
+    font-size: 1.3rem;
+  }
+
+  .m-table-cap,
+  .m-table-status {
+    font-size: 0.7rem;
+  }
+
+  .takeaway-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+  }
+
+  .c-item-card {
+    min-height: auto;
+    border-radius: 8px;
+  }
+
+  .c-item-img,
+  .image-placeholder {
+    height: 70px;
+  }
+
+  .c-item-details {
+    padding: 6px;
+  }
+
+  .c-item-title {
+    font-size: 0.7rem;
+  }
+
+  .c-item-price {
+    font-size: 0.8rem;
+  }
+
+  .takeaway-menu {
+    padding: 12px;
+    border-radius: var(--radius);
+  }
+
+  .takeaway-cart {
+    padding: 12px;
+    border-radius: var(--radius);
+  }
+
+  .cart-grand-total {
+    font-size: 0.85rem;
+  }
+
+  .menu-header-c {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .search-c {
+    padding: 9px 12px;
+    font-size: 0.85rem;
+    border-radius: 8px;
+  }
+
+  .cat-scroll {
+    gap: 6px;
+  }
+
+  .cat-btn-c {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    border-radius: 16px;
+  }
+
+  .customer-inputs-c {
+    gap: 10px;
+  }
+
+  .customer-inputs-c .input {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+
+  .active-orders-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .item-qty-c button {
+    width: 22px;
+    height: 22px;
+    font-size: 0.8rem;
+  }
+
+  .variation-options-modern {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .variation-card-modern {
+    padding: 12px;
+  }
+
+  .v-name {
+    font-size: 0.9rem;
+  }
+}
+
+/* Extra small devices (≤360px) */
+@media (max-width: 360px) {
+  .tables-grid-modern {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .takeaway-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .counter-tabs {
+    gap: 2px;
+    padding: 3px;
+  }
+
+  .tab {
+    font-size: 0.65rem;
+    padding: 6px 4px;
   }
 }
 

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Waiter - Tables</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .waiter-header {
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--glass-border);
+      padding: 0 20px;
+      height: var(--header-height);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+    }
+
+    .nav-tab {
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nav-tab.active {
+      background: var(--bg-active);
+      color: var(--primary);
+    }
+
+    .tables-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 140px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .table-card.occupied {
+      border-color: var(--warning);
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    .table-card.available {
+      border-color: var(--success);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    .table-number {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .table-status {
+      margin-top: 8px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+    }
+
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="waiter-header flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="btn btn-outline" style="padding: 8px 12px">←</a>
+      <h2>🧑‍🍳 Waiter</h2>
+    </div>
+    <nav class="nav-tabs">
+      <a href="waiter.html" class="nav-tab active">🪑 Tables</a>
+      <a href="menu.html" class="nav-tab">🍽️ Menu</a>
+      <a href="orders.html" class="nav-tab">🔔 Orders</a>
+    </nav>
+  </header>
+
+  <div class="container animate-fadeIn" style="margin-top: 20px">
+    <div class="tables-grid">
+      <div class="table-card available">
+        <span class="table-number">T1</span>
+        <span class="table-status" style="color: var(--success)">Available</span>
+      </div>
+      <div class="table-card occupied">
+        <span class="table-number">T2</span>
+        <span class="table-status" style="color: var(--warning)">Occupied</span>
+        <div style="font-size: 0.8rem; margin-top: 4px; opacity: 0.7">4 Guests</div>
+      </div>
+      <div class="table-card available">
+        <span class="table-number">T3</span>
+        <span class="table-status" style="color: var(--success)">Available</span>
+      </div>
+      <div class="table-card occupied">
+        <span class="table-number">T4</span>
+        <span class="table-status" style="color: var(--warning)">Occupied</span>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

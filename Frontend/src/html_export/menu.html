@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Waiter - Menu</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Layout mirroring WaiterPage menu logic */
+    .menu-layout {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+      height: calc(100vh - var(--header-height));
+      overflow: hidden;
+    }
+
+    .menu-section {
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .category-scroll {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+
+    .cat-btn {
+      white-space: nowrap;
+      padding: 8px 16px;
+      border-radius: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .cat-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    .menu-item-card {
+      background: var(--bg-card);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .menu-item-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary);
+    }
+
+    .cart-section {
+      background: var(--bg-card);
+      border-left: 1px solid var(--glass-border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+    }
+
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: var(--bg-input);
+      margin-bottom: 8px;
+      border-radius: var(--radius-sm);
+    }
+  </style>
+</head>
+
+<body>
+  <header
+    style="height: 70px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+    <a href="waiter.html" class="btn btn-outline" style="margin-right: 16px">← Back</a>
+    <nav style="display: flex; gap: 10px;">
+      <a href="waiter.html" class="btn btn-outline">Tables</a>
+      <a href="#" class="btn btn-primary">Menu</a>
+      <a href="orders.html" class="btn btn-outline">Orders</a>
+    </nav>
+  </header>
+
+  <div class="menu-layout animate-fadeIn">
+    <div class="menu-section">
+      <input type="text" class="input" placeholder="🔍 Search items..." style="margin-bottom: 20px">
+
+      <div class="category-scroll">
+        <button class="cat-btn active">All</button>
+        <button class="cat-btn">Starters</button>
+        <button class="cat-btn">Biryani</button>
+        <button class="cat-btn">Drinks</button>
+      </div>
+
+      <div class="menu-grid">
+        <div class="menu-item-card">
+          <div style="font-size: 2rem; text-align: center">🍗</div>
+          <div class="font-bold">Chicken Biryani</div>
+          <div style="color: var(--primary)">₹250</div>
+        </div>
+        <div class="menu-item-card">
+          <div style="font-size: 2rem; text-align: center">🥗</div>
+          <div class="font-bold">Paneer Tikka</div>
+          <div style="color: var(--primary)">₹220</div>
+        </div>
+        <div class="menu-item-card">
+          <div style="font-size: 2rem; text-align: center">🥤</div>
+          <div class="font-bold">Coke</div>
+          <div style="color: var(--primary)">₹40</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cart-section">
+      <h3>Billing Table T2</h3>
+      <div style="flex: 1; overflow-y: auto; margin-top: 20px">
+        <div class="cart-item">
+          <div>
+            <div>Chicken Biryani</div>
+            <small>x2</small>
+          </div>
+          <div>₹500</div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--glass-border); padding-top: 20px">
+        <div class="flex justify-between font-bold" style="font-size: 1.2rem; margin-bottom: 20px">
+          <span>Total</span>
+          <span>₹500.00</span>
+        </div>
+        <button class="btn btn-primary" style="width: 100%">Place Order</button>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

@@ -28,7 +28,7 @@ function CounterPage() {
 
   // History Pagination State
   const [historyPage, setHistoryPage] = useState(1);
-  const [historyPageSize] = useState(7);
+  const [historyPageSize] = useState(12);
 
   const [stockAlerts, setStockAlerts] = useState([]);
 
@@ -85,7 +85,7 @@ function CounterPage() {
       ]);
       setOrders(activeRes.data);
       // Sort history to show newest first
-      setAllOrders(allRes.data.sort((a, b) => b.id - a.id));
+      setAllOrders(allRes.data.filter(o => o.status === 'PAID').sort((a, b) => b.id - a.id));
     } catch (err) { console.error(err); }
   };
 
@@ -675,7 +675,7 @@ function CounterPage() {
                             <button className="btn btn-xs btn-primary" onClick={(e) => {
                               e.stopPropagation();
                               handleReprint(order);
-                            }}>🖨️ Reprint</button>
+                            }}>Reprint</button>
                           )}
                         </div>
                       </td>

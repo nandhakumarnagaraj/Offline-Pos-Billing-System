@@ -51,16 +51,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 const Home = () => {
   const { user, logout } = useAuth();
   const validRoles = ['ADMIN', 'MANAGER'];
-  const [stats, setStats] = useState(null);
-
-  useEffect(() => {
-    if (user && validRoles.includes(user.role)) {
-      getDashboard()
-        .then(res => setStats(res.data))
-        .catch(err => console.error("Failed to load home stats", err));
-    }
-  }, [user]);
-
   return (
     <div className="home-container">
       <div className="home-content">
@@ -68,40 +58,14 @@ const Home = () => {
           <div className="brand-logo">🍛</div>
           <h1 className="brand-title">KhanaBook</h1>
           <p className="brand-subtitle">Restaurant POS & Management System</p>
-          <div className="user-welcome">
-            Welcome, <strong>{user?.displayName}</strong> ({user?.role})
-            <button className="btn btn-sm btn-outline logout-btn" onClick={logout}>Sign Out</button>
-          </div>
         </div>
-
-        {stats && (
-          <div className="quick-stats animate-fadeIn">
-            <div className="stat-item">
-              <span className="stat-value">₹{stats.todayRevenue?.toFixed(0)}</span>
-              <span className="stat-label">Today's Revenue</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-value">{stats.todayOrders}</span>
-              <span className="stat-label">Sales</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-value">{stats.activeOrders}</span>
-              <span className="stat-label">Active</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-value">₹{stats.todayExpenses?.toFixed(0)}</span>
-              <span className="stat-label">Expenses</span>
-            </div>
-          </div>
-        )}
 
         <div className="nav-grid">
           {(validRoles.includes(user?.role) || user?.role === 'WAITER') && (
             <Link to="/waiter" className="nav-card waiter-card">
               <div className="nav-icon">🍽️</div>
               <h2>Waiter</h2>
-              <p>Take dine-in & takeaway orders</p>
-              <div className="nav-arrow">→</div>
+
             </Link>
           )}
 
@@ -109,8 +73,7 @@ const Home = () => {
             <Link to="/kitchen" className="nav-card kitchen-card">
               <div className="nav-icon">👨‍🍳</div>
               <h2>Kitchen (KDS)</h2>
-              <p>View & manage order preparation</p>
-              <div className="nav-arrow">→</div>
+
             </Link>
           )}
 
@@ -118,8 +81,7 @@ const Home = () => {
             <Link to="/counter" className="nav-card counter-card">
               <div className="nav-icon">💰</div>
               <h2>Cashier / Billing</h2>
-              <p>Process payments & generate bills</p>
-              <div className="nav-arrow">→</div>
+
             </Link>
           )}
 
@@ -127,8 +89,7 @@ const Home = () => {
             <Link to="/manager" className="nav-card manager-card">
               <div className="nav-icon">📊</div>
               <h2>Manager</h2>
-              <p>Reports, menu, stock & users</p>
-              <div className="nav-arrow">→</div>
+
             </Link>
           )}
         </div>
