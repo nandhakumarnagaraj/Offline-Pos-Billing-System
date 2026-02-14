@@ -520,9 +520,7 @@ function ManagerPage() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div className="user-info-sm">
-            <small>Logged in as <b>{user?.username}</b></small>
-          </div>
+
           <button className="btn btn-outline btn-sm" onClick={handleBackup}>💾 Backup DB</button>
           <button className="btn btn-danger btn-sm" onClick={logout} style={{ marginTop: '8px' }}>🚪 Sign Out</button>
         </div>

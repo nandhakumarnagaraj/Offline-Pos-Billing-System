@@ -85,8 +85,7 @@ function LoginPage() {
         </form>
 
         <div className="login-footer">
-          <p>Offline LAN System · No internet required</p>
-        </div>
+                  </div>
       </div>
     </div>
   );

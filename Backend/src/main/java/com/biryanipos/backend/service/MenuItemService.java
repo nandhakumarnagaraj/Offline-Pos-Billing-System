@@ -129,17 +129,17 @@ public class MenuItemService {
                 return menuItemRepository.save(item);
         }
 
-        @Transactional
-        public void deleteItem(Long id) {
+            @Transactional
+            public void deleteItem(Long id) {
                 if (id == null) {
-                        throw new RuntimeException("Menu item ID is required");
+                    throw new RuntimeException("Menu item ID is required");
                 }
-                if (!menuItemRepository.existsById(id)) {
-                        throw new RuntimeException("Menu item not found: " + id);
-                }
-                menuItemRepository.deleteById(id);
-        }
-
+                MenuItem item = menuItemRepository.findById(id)
+                        .orElseThrow(() -> new RuntimeException("Menu item not found: " + id));
+        
+                item.setAvailable(false);
+                menuItemRepository.save(item);
+            }
         @Transactional
         public MenuItem updateRecipe(Long menuItemId, List<RecipeIngredientRequest> ingredients) {
                 MenuItem item = menuItemRepository.findById(menuItemId)

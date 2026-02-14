@@ -318,13 +318,13 @@ function WaiterPage() {
 
         <nav className="counter-tabs">
           <button className={`tab ${view === 'tables' ? 'active' : ''}`} onClick={() => setView('tables')}>
-            🪑 Tables
+            Tables
           </button>
           <button className={`tab ${view === 'menu' ? 'active' : ''}`} onClick={() => setView('menu')}>
-            🍽️ DineIn Order
+            DineIn Order
           </button>
           <button className={`tab ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>
-            🔔 Active Orders <span className="tab-count">{activeOrders.length}</span>
+            Active Orders <span className="tab-count">{activeOrders.length}</span>
           </button>
           <button className="btn btn-outline btn-sm logout-btn-header" onClick={logout} style={{ marginLeft: '16px' }}>Sign Out</button>
         </nav>
@@ -405,7 +405,7 @@ function WaiterPage() {
               {/* Right Side: New Order Cart (Identical to Cashier) */}
               <div className="takeaway-cart glass-card">
                 <div className="flex-between">
-                  <h3>🛍️ DineIn Order</h3>
+                  <h3>DineIn Order</h3>
                   <div className="selected-info">
                     {selectedTable ? (
                       <span className="badge badge-success">Table {selectedTable}</span>

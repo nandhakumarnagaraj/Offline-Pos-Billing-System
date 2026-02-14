@@ -95,7 +95,7 @@ const Home = () => {
         </div>
 
         <div className="home-footer">
-          <p>Logged in as {user?.username}</p>
+
         </div>
       </div>
     </div>

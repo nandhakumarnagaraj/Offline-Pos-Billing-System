@@ -291,6 +291,10 @@
 }
 
 /* ===== MENU GRID - INSTAGRAM-STYLE ===== */
+.counter-takeaway {
+  height: 100%;
+}
+
 .takeaway-layout {
   display: grid;
   grid-template-columns: 1fr 420px;
@@ -407,7 +411,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 220px;
+  height: 200px;
 }
 
 .c-item-card::after {
@@ -537,19 +541,25 @@
   padding: 12px 24px;
 }
 
+.takeaway-cart .flex-between {
+  margin-bottom: var(--space-md); /* Add margin to create a gap */
+}
+
 .takeaway-cart h3 {
-  font-size: 0.75rem;
-  margin-bottom: 5px;
+  font-size: 1.5rem;
+  margin-bottom: var(--space-md);
 }
 
 .customer-inputs-c {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 12px;
   margin-bottom: 5px;
+  align-items: center; /* Align items vertically in the center */
 }
 
 .customer-inputs-c .input {
+  flex: 1; /* Make inputs take equal space */
   font-size: 0.8rem;
   padding: 10px 14px;
 }
@@ -564,11 +574,11 @@
 
 .cart-item-c {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   padding: var(--space-md) 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   transition: var(--transition);
+  gap: 12px; /* Added a consistent gap */
 }
 
 .cart-item-c:hover {
@@ -1017,7 +1027,6 @@
   .takeaway-layout {
     grid-template-columns: 1fr 380px;
   }
-
   .takeaway-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }

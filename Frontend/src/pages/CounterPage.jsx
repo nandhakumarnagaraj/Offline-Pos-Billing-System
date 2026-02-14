@@ -395,7 +395,7 @@ function CounterPage() {
             Pending Bills
           </button>
           <button className={`tab ${view === 'takeaway' ? 'active' : ''}`} onClick={() => { setView('takeaway'); setSelectedOrder(null); }}>
-            🛍️ Takeaway
+            Takeaway
           </button>
           <button className={`tab ${view === 'history' ? 'active' : ''}`} onClick={() => { setView('history'); setSelectedOrder(null); }}>
             All Orders
@@ -460,41 +460,55 @@ function CounterPage() {
                     const matchCat = activeCategory === 'All' || item.category === activeCategory;
                     const matchSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase());
                     return matchCat && matchSearch;
-                  }).map(item => (
-                    <div key={item.id} className="c-item-card" onClick={() => addToCart(item)}>
-                      {item.imageUrl && (
-                        <img src={item.imageUrl} alt={item.name} className="c-item-img" />
-                      )}
-                      <div className="c-item-details">
-                        <div className="c-item-title">{item.name}</div>
-                        <div className="c-item-price">₹{item.price}</div>
+                  }).map(item => {
+                    const hasVariations = item.variations && item.variations.length > 0;
+                    const displayPrice = hasVariations
+                      ? Math.min(...item.variations.map(v => v.price))
+                      : item.price;
+                    const inCartQty = !hasVariations && cart[item.id] ? cart[item.id].qty : 0;
+
+                    return (
+                      <div key={item.id} className={`c-item-card ${inCartQty > 0 ? 'active' : ''}`} onClick={() => addToCart(item)}>
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="c-item-img" loading="lazy" />
+                        ) : (
+                          <div className="image-placeholder">🍛</div>
+                        )}
+                        <div className="c-item-details">
+                          <div className="c-item-title">{item.name}</div>
+                          <div className="c-item-price">₹{displayPrice}{hasVariations ? '+' : ''}</div>
+                        </div>
+                        {inCartQty > 0 && <div className="cart-badge-qty">{inCartQty}</div>}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
               <div className="takeaway-cart glass-card">
-                <h3>🛍️ New Order</h3>
+                <h3>New Order</h3>
                 <div className="customer-inputs-c">
                   <input className="input" placeholder="Customer Name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
                   <input className="input" placeholder="WhatsApp Number" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
                 </div>
                 <div className="cart-list-c">
-                  {Object.entries(cart).map(([key, c]) => (
-                    <div key={key} className="cart-item-c">
-                      <div className="item-details-c">
-                        <span>{c.item.name}</span>
-                        <div className="item-qty-c">
-                          <button className="qty-btn-c" onClick={() => removeFromCart(key)}>−</button>
-                          <span>{c.qty}</span>
-                          <button className="qty-btn-c" onClick={() => addToCart(c.item, c.variation)}>+</button>
+                  {Object.keys(cart).length === 0 ? (
+                    <div className="empty-cart-c">Cart is empty</div>
+                  ) : (
+                    Object.entries(cart).map(([key, c]) => (
+                      <div key={key} className="cart-item-c">
+                        <div className="item-details-c">
+                          <span className="item-name-c">{c.item.name} {c.variation ? `(${c.variation.name})` : ''}</span>
+                          <div className="item-qty-c">
+                            <button className="qty-btn-c" onClick={() => removeFromCart(key)}>−</button>
+                            <span>{c.qty}</span>
+                            <button className="qty-btn-c" onClick={() => addToCart(c.item, c.variation)}>+</button>
+                          </div>
                         </div>
+                        <span className="item-total-c">₹{((c.variation?.price || c.item.price) * c.qty).toFixed(0)}</span>
                       </div>
-                      <span className="item-total-c">₹{((c.variation?.price || c.item.price) * c.qty).toFixed(0)}</span>
-                    </div>
-                  ))}
-                  {Object.keys(cart).length === 0 && <div className="empty-cart-c">Cart is empty</div>}
+                    ))
+                  )}
                 </div>
                 <div className="cart-footer-c">
                   <div className="cart-grand-total">Total: ₹{cartTotal.toFixed(2)}</div>
