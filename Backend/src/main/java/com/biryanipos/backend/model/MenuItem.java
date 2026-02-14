@@ -11,7 +11,11 @@ import lombok.Builder;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "menu_items")
+@Table(name = "menu_items", indexes = {
+    @Index(name = "idx_menu_category", columnList = "category"),
+    @Index(name = "idx_menu_name", columnList = "name"),
+    @Index(name = "idx_menu_available", columnList = "available")
+})
 public class MenuItem {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

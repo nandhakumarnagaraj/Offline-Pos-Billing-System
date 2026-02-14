@@ -13,8 +13,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.biryanipos.backend.constant.AppConstants;
-
+import com.biryanipos.backend.config.AppProperties;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +28,7 @@ public class OrderService {
   private final TableRepository tableRepository;
   private final StockService stockService;
   private final SimpMessagingTemplate messagingTemplate;
+  private final AppProperties appProperties;
 
   @Transactional
   public Order createOrder(OrderRequest request) {
@@ -115,15 +115,15 @@ public class OrderService {
 
       subtotal += itemPrice * itemRequest.getQuantity();
       int prepTime = menuItem.getPrepTimeMinutes() > 0 ? menuItem.getPrepTimeMinutes()
-          : AppConstants.DEFAULT_PREP_TIME_MINUTES;
+          : appProperties.getOrder().getDefaultPrepTimeMinutes();
       if (prepTime > maxPrepTime)
         maxPrepTime = prepTime;
 
       orderItems.add(orderItem);
     }
 
-    if (maxPrepTime < AppConstants.DEFAULT_PREP_TIME_MINUTES)
-      maxPrepTime = AppConstants.DEFAULT_PREP_TIME_MINUTES;
+    if (maxPrepTime < appProperties.getOrder().getDefaultPrepTimeMinutes())
+      maxPrepTime = appProperties.getOrder().getDefaultPrepTimeMinutes();
     order.setEstimatedReadyTime(LocalDateTime.now().plusMinutes(maxPrepTime));
 
     order.setItems(orderItems);
@@ -452,7 +452,7 @@ public class OrderService {
       }
 
       // Stock Alert
-      if (menuItem.getStockLevel() < 50.0) {
+      if (menuItem.getStockLevel() < appProperties.getInventory().getDefaultLowStockThreshold()) {
         messagingTemplate.convertAndSend("/topic/stock/alerts",
             "RUNNING OUT OF STOCK: " + menuItem.getName() + " (" + menuItem.getStockLevel() + " remaining)");
       }

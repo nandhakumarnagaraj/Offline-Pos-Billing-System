@@ -7,10 +7,11 @@ import { connectWebSocket } from '../service/ws';
 import { useAuth } from '../context/AuthContext';
 import ThermalReceipt from '../components/ThermalReceipt';
 import { addPendingSync } from '../db';
-import { shopConfig } from '../config/shopConfig';
+import { useConfig } from '../context/ConfigContext';
 import './CounterPage.css';
 
 function CounterPage() {
+  const { config: shopConfig } = useConfig();
   const { logout } = useAuth();
   const [orders, setOrders] = useState([]);
   const [allOrders, setAllOrders] = useState([]);
@@ -27,7 +28,7 @@ function CounterPage() {
 
   // History Pagination State
   const [historyPage, setHistoryPage] = useState(1);
-  const [historyPageSize] = useState(8);
+  const [historyPageSize] = useState(7);
 
   const [stockAlerts, setStockAlerts] = useState([]);
 
@@ -103,13 +104,25 @@ function CounterPage() {
       setBillData(res.data);
       setWhatsappPhone(res.data.customerPhone || '');
       setView('bill');
-      setView('bill');
       setDiscount('');
       setAmountReceived('');
       setIsMultiPay(false);
       setAddedPayments([]);
       setPaymentMode('CASH');
     } catch (err) { console.error(err); }
+  };
+
+  const handleReprint = async (order) => {
+    try {
+      const res = await getBill(order.id);
+      setBillData(res.data);
+      // For PAID orders, we should use the actual discount from the order
+      setDiscount(order.discount || 0);
+      setTimeout(() => window.print(), 500);
+    } catch (err) {
+      console.error("Reprint failed", err);
+      alert("⚠️ Failed to fetch bill data for reprint.");
+    }
   };
 
   const handlePayment = async () => {
@@ -473,9 +486,9 @@ function CounterPage() {
                       <div className="item-details-c">
                         <span>{c.item.name}</span>
                         <div className="item-qty-c">
-                          <button onClick={() => removeFromCart(key)}>−</button>
+                          <button className="qty-btn-c" onClick={() => removeFromCart(key)}>−</button>
                           <span>{c.qty}</span>
-                          <button onClick={() => addToCart(c.item, c.variation)}>+</button>
+                          <button className="qty-btn-c" onClick={() => addToCart(c.item, c.variation)}>+</button>
                         </div>
                       </div>
                       <span className="item-total-c">₹{((c.variation?.price || c.item.price) * c.qty).toFixed(0)}</span>
@@ -502,48 +515,44 @@ function CounterPage() {
               <div className="bill-preview glass-card">
                 <div className="bill-header-sec">
                   <div className="flex-between">
-                    <h2>🧾 Invoice</h2>
-                    <div className="bill-actions-header">
-                      <button className="btn btn-outline btn-sm" onClick={handlePrint}>
-                        �️ Print Receipt
-                      </button>
-                    </div>
+                    <h2>Invoice</h2>
+                    <button className="btn btn-outline" onClick={handlePrint}>
+                      Print Receipt
+                    </button>
                   </div>
                   <div className="bill-meta">
-                    <div>Order {billData.orderId}</div>
-                    <div>Table: {billData.tableNumber}</div>
-                    <div>Type: {billData.orderType?.replace('_', ' ')}</div>
-                    {billData.customerName && <div>Customer: {billData.customerName}</div>}
-                    <div>Date: {billData.createdAt}</div>
+                    <div><span className="meta-label">Order ID:</span> {billData.orderId}</div>
+                    {billData.orderType !== 'TAKEAWAY' && <div><span className="meta-label">Table:</span> {billData.tableNumber}</div>}
+                    <div><span className="meta-label">Type:</span> {billData.orderType?.replace('_', ' ')}</div>
+                    {billData.customerName && <div className="span-2"><span className="meta-label">Customer:</span> {billData.customerName}</div>}
                   </div>
                 </div>
 
-                <table className="bill-table">
-                  <thead>
-                    <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
-                  </thead>
-                  <tbody>
-                    {billData.items?.map((item, i) => (
-                      <tr key={i}>
-                        <td>{item.name}</td>
-                        <td>{item.quantity}</td>
-                        <td>₹{item.unitPrice.toFixed(2)}</td>
-                        <td>₹{item.total.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="bill-main-content">
+                  <table className="bill-table">
+                    <thead>
+                      <tr><th>SL</th><th>Item</th><th>QTY</th><th>Total</th></tr>
+                    </thead>
+                    <tbody>
+                      {billData.items?.map((item, i) => (
+                        <tr key={i}>
+                          <td>{i + 1}</td>
+                          <td>{item.name}</td>
+                          <td>{item.quantity}</td>
+                          <td>₹{item.total.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
 
-                <div className="bill-totals">
-                  <div className="bill-row"><span>Subtotal</span><span>₹{billData.subtotal?.toFixed(2)}</span></div>
-                  {parseFloat(discount) > 0 && (
-                    <div className="bill-row discount"><span>Discount</span><span>-₹{parseFloat(discount).toFixed(2)}</span></div>
-                  )}
-                  <div className="bill-row"><span>CGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.cgst?.toFixed(2)}</span></div>
-                  <div className="bill-row"><span>SGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.sgst?.toFixed(2)}</span></div>
-                  <div className="bill-row bill-grand-total">
-                    <span>Grand Total</span>
-                    <span>₹{calc.total?.toFixed(2)}</span>
+                  <div className="bill-totals">
+                    <div className="bill-row"><span>Subtotal</span><span>₹{billData.subtotal?.toFixed(2)}</span></div>
+                    <div className="bill-row"><span>CGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.cgst?.toFixed(2)}</span></div>
+                    <div className="bill-row"><span>SGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.sgst?.toFixed(2)}</span></div>
+                    <div className="bill-row bill-grand-total">
+                      <span>Grand Total</span>
+                      <span>₹{calc.total?.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -564,19 +573,14 @@ function CounterPage() {
                         <button key={mode}
                           className={`payment-mode-btn ${paymentMode === mode ? 'active' : ''}`}
                           onClick={() => setPaymentMode(mode)}>
-                          {mode === 'CASH' ? '💵' : mode === 'CARD' ? '💳' : '📱'} {mode}
+                          <span className="mode-icon">{mode === 'CASH' ? '💵' : mode === 'CARD' ? '💳' : '📱'}</span>
+                          <span className="mode-name">{mode}</span>
                         </button>
                       ))}
                     </div>
 
                     <div className="payment-fields">
-                      <label>Discount (₹)</label>
-                      <input className="input" type="number" placeholder="0" value={discount}
-                        onChange={e => setDiscount(e.target.value)} />
 
-                      <label>Customer WhatsApp</label>
-                      <input className="input" type="text" placeholder="Phone Number" value={whatsappPhone}
-                        onChange={e => setWhatsappPhone(e.target.value)} />
 
                       {paymentMode === 'CASH' && (
                         <>
@@ -594,13 +598,7 @@ function CounterPage() {
                   </>
                 ) : (
                   <div className="multi-pay-section animate-fadeIn">
-                    <label>Discount (₹)</label>
-                    <input className="input" type="number" placeholder="0" value={discount}
-                      onChange={e => setDiscount(e.target.value)} />
 
-                    <label>Customer WhatsApp</label>
-                    <input className="input" type="text" placeholder="Phone Number" value={whatsappPhone}
-                      onChange={e => setWhatsappPhone(e.target.value)} />
 
                     <div className="payment-summary-box">
                       <div>Total Due: <strong>₹{calc.total.toFixed(2)}</strong></div>
@@ -641,7 +639,7 @@ function CounterPage() {
                   <button className="btn btn-outline" onClick={() => { setView('pending'); setSelectedOrder(null); }}>
                     Cancel
                   </button>
-                  <button className="btn btn-success btn-lg" onClick={handlePayment}
+                  <button className="btn btn-success" onClick={handlePayment}
                     disabled={loading || (isMultiPay && calc.multiPayRemaining > 0)}>
                     {loading ? '⏳ Processing...' : (isMultiPay ? '✅ Settle Bill' : `✅ Pay ₹${calc.total?.toFixed(2)}`)}
                   </button>
@@ -658,29 +656,26 @@ function CounterPage() {
               <table className="history-table">
                 <thead>
                   <tr>
-                    <th>#</th><th>Table</th><th>Type</th>
+                    <th>OrderID</th><th>Type</th>
                     <th>Items</th><th>Total</th><th>Status</th><th>Time</th><th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {allOrders.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize).map(order => (
-                    <tr key={order.id} className={`row-${order.status?.toLowerCase()}`}
-                      onClick={() => order.status === 'PAID' ? selectForBilling(order) : null}>
+                  {allOrders.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize).map((order, idx) => (
+                    <tr key={order.id} className={`row-${order.status?.toLowerCase()} animate-fadeIn`} style={{ animationDelay: `${idx * 0.05}s` }}>
                       <td><span className="order-id-badge">{order.id}</span></td>
-                      <td><span className="table-badge">{order.tableNumber}</span></td>
                       <td><span className="type-tag">{order.orderType?.replace('_', ' ')}</span></td>
                       <td>{order.items?.length} items</td>
                       <td className="amount-cell">₹{order.totalAmount?.toFixed(2)}</td>
                       <td><span className={`badge badge-${order.status?.toLowerCase()}`}>{order.status}</span></td>
-                      <td className="time-cell">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</td>
+                      <td className="time-cell">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}</td>
                       <td>
                         <div className="action-cell">
                           {order.status === 'PAID' && (
                             <button className="btn btn-xs btn-primary" onClick={(e) => {
                               e.stopPropagation();
-                              selectForBilling(order);
-                              setTimeout(() => window.print(), 500);
-                            }}>🖨️ Print</button>
+                              handleReprint(order);
+                            }}>🖨️ Reprint</button>
                           )}
                         </div>
                       </td>

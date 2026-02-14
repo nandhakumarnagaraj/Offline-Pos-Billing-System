@@ -2,7 +2,8 @@ package com.biryanipos.backend.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
+import com.biryanipos.backend.config.AppProperties;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -10,16 +11,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
+@RequiredArgsConstructor
 public class JwtUtil {
 
-  @Value("${jwt.secret:KhanaBookPOS-SuperSecretKey-2024-OfflineLAN-SystemKey123456}")
-  private String secret;
-
-  @Value("${jwt.expiration:86400000}") // 24 hours
-  private long expirationMs;
+  private final AppProperties appProperties;
 
   private SecretKey getSigningKey() {
-    return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    return Keys.hmacShaKeyFor(appProperties.getSecurity().getJwtSecret().getBytes(StandardCharsets.UTF_8));
   }
 
   public String generateToken(String username, String role) {
@@ -27,7 +25,7 @@ public class JwtUtil {
         .subject(username)
         .claim("role", role)
         .issuedAt(new Date())
-        .expiration(new Date(System.currentTimeMillis() + expirationMs))
+        .expiration(new Date(System.currentTimeMillis() + appProperties.getSecurity().getJwtExpirationMs()))
         .signWith(getSigningKey())
         .compact();
   }

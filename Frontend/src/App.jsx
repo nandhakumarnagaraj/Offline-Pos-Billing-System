@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ConfigProvider } from './context/ConfigContext';
 import { getDashboard } from './service/api';
 import SyncManager from './components/SyncManager';
 import './App.css';
@@ -142,54 +143,56 @@ const Home = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <SyncManager />
-      <Router>
-        <Suspense fallback={<LoadingFallback />}>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
+    <ConfigProvider>
+      <AuthProvider>
+        <SyncManager />
+        <Router>
+          <Suspense fallback={<LoadingFallback />}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
 
-            <Route path="/change-password" element={
-              <ProtectedRoute>
-                <ChangePasswordPage />
-              </ProtectedRoute>
-            } />
+              <Route path="/change-password" element={
+                <ProtectedRoute>
+                  <ChangePasswordPage />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Home />
-              </ProtectedRoute>
-            } />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <Home />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/waiter" element={
-              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'WAITER']}>
-                <WaiterPage />
-              </ProtectedRoute>
-            } />
+              <Route path="/waiter" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'WAITER']}>
+                  <WaiterPage />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/kitchen" element={
-              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'KITCHEN']}>
-                <KitchenPage />
-              </ProtectedRoute>
-            } />
+              <Route path="/kitchen" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'KITCHEN']}>
+                  <KitchenPage />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/counter" element={
-              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'CASHIER']}>
-                <CounterPage />
-              </ProtectedRoute>
-            } />
+              <Route path="/counter" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'CASHIER']}>
+                  <CounterPage />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/manager" element={
-              <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
-                <ManagerPage />
-              </ProtectedRoute>
-            } />
+              <Route path="/manager" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
+                  <ManagerPage />
+                </ProtectedRoute>
+              } />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </Router>
-    </AuthProvider>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </Router>
+      </AuthProvider>
+    </ConfigProvider>
   );
 }
 

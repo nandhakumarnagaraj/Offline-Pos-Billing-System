@@ -4,11 +4,13 @@ import { getAvailableMenuItems, createOrder, addItemsToOrder, getActiveOrders, g
 import { connectWebSocket } from '../service/ws';
 import { addPendingSync } from '../db';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
 import LoadingOverlay from '../components/LoadingOverlay';
 import Modal from '../components/Modal';
 import './WaiterPage.css';
 
 function WaiterPage() {
+  const { config: shopConfig } = useConfig();
   const { logout } = useAuth();
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -264,7 +266,7 @@ function WaiterPage() {
     let totalSgst = 0;
 
     billData.items?.forEach(item => {
-      const itemGst = item.gstPercent || 5.0;
+      const itemGst = item.gstPercent || shopConfig.gstPercentage;
       const itemTax = (item.total * (itemGst / 100));
       totalCgst += itemTax / 2;
       totalSgst += itemTax / 2;
@@ -522,8 +524,8 @@ function WaiterPage() {
                   {parseFloat(discount) > 0 && (
                     <div className="bill-row discount"><span>Discount</span><span>-₹{parseFloat(discount).toFixed(2)}</span></div>
                   )}
-                  <div className="bill-row"><span>CGST (2.5%)</span><span>₹{calc.cgst?.toFixed(2)}</span></div>
-                  <div className="bill-row"><span>SGST (2.5%)</span><span>₹{calc.sgst?.toFixed(2)}</span></div>
+                  <div className="bill-row"><span>CGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.cgst?.toFixed(2)}</span></div>
+                  <div className="bill-row"><span>SGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.sgst?.toFixed(2)}</span></div>
                   <div className="bill-row bill-grand-total">
                     <span>Grand Total</span>
                     <span>₹{calc.total?.toFixed(2)}</span>

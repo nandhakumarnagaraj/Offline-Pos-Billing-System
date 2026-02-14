@@ -1,0 +1,58 @@
+# Server Configuration
+server:
+  port: 8080
+
+# Spring Configuration
+spring:
+  application:
+    name: biryani-pos-backend
+  
+  # Database Configuration
+  datasource:
+    url: jdbc:h2:file:./data/posdb;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  
+  # JPA/Hibernate
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    database-platform: org.hibernate.dialect.H2Dialect
+  
+  # H2 Console
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+# Application Specific Properties (Mapped to AppProperties)
+app:
+  shop:
+    name: "BIRYANIWALE ANNA"
+    address: "B.N MARKET, JAGDEO PATH, ANISABAD RD, KHAJPURA, PATNA"
+    phone: "7418135699"
+    gstin: "3############T"
+    fssai: "10425000000318"
+  
+  tax:
+    default-gst-percent: 5.0
+  
+  order:
+    default-prep-time-minutes: 15
+    freeze-window-minutes: 10
+  
+  inventory:
+    default-low-stock-threshold: 50.0
+  
+  security:
+    jwt-secret: "KhanaBookPOS-SuperSecretKey-2024-OfflineLAN-SystemKey123456"
+    jwt-expiration-ms: 86400000
+    allowed-origins: "http://localhost:5173,http://127.0.0.1:5173"
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.biryanipos.backend: DEBUG

@@ -10,7 +10,9 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "stock_items")
+@Table(name = "stock_items", indexes = {
+    @Index(name = "idx_stock_active", columnList = "active")
+})
 public class StockItem {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

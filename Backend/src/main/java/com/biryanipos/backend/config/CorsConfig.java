@@ -1,5 +1,6 @@
 package com.biryanipos.backend.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -9,20 +10,18 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 
 @Configuration
+@RequiredArgsConstructor
 public class CorsConfig {
+
+  private final AppProperties appProperties;
 
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration config = new CorsConfiguration();
 
     // Use allowedOriginPatterns to support wildcards with credentials
-    // Using specific patterns for local network and localhost
     config.setAllowedOriginPatterns(Arrays.asList(
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://192.168.*.*:5173",
-        "http://*:5173" // More permissive for local dev
-    ));
+        appProperties.getSecurity().getAllowedOrigins().split(",")));
 
     config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
     config.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Requested-With",

@@ -1,8 +1,9 @@
 import React from 'react';
 import './ThermalReceipt.css';
-import { shopConfig } from '../config/shopConfig';
+import { useConfig } from '../context/ConfigContext';
 
 const ThermalReceipt = ({ billData, calc }) => {
+  const { config: shopConfig } = useConfig();
   if (!billData) return null;
 
   const today = new Date().toLocaleDateString('en-GB', {
