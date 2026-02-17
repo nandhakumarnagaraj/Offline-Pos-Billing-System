@@ -1,0 +1,25 @@
+# H2 Database files
+Backend/data/*.db
+
+# Build artifacts
+**/target/
+**/dist/
+**/node_modules/
+**/build/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+
+# Cursor debug/runtime artifacts
+.cursor/

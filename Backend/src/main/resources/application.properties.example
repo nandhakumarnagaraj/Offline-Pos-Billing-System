@@ -1,0 +1,49 @@
+# Server Configuration
+server.port=8080
+
+# Spring Configuration
+spring.application.name=biryani-pos-backend
+
+# Database Configuration
+spring.datasource.url=jdbc:h2:file:./data/posdb;AUTO_SERVER=TRUE
+spring.datasource.driver-class-name=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=password
+
+# JPA/Hibernate
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=false
+
+# H2 Console
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+
+# Application Specific Properties
+app.shop.name=YOUR_SHOP_NAME
+app.shop.address=YOUR_SHOP_ADDRESS
+app.shop.phone=YOUR_PHONE
+app.shop.gstin=YOUR_GSTIN
+app.shop.fssai=YOUR_FSSAI
+
+app.tax.default-gst-percent=5.0
+
+app.order.default-prep-time-minutes=15
+app.order.freeze-window-minutes=10
+
+app.inventory.default-low-stock-threshold=50.0
+
+app.security.jwt-secret=YOUR_JWT_SECRET
+app.security.jwt-expiration-ms=86400000
+app.security.allowed-origins=*
+
+# Easebuzz Configuration (Get these from Easebuzz Dashboard)
+app.easebuzz.key=YOUR_EASEBUZZ_KEY
+app.easebuzz.salt=YOUR_EASEBUZZ_SALT
+app.easebuzz.env=test
+app.easebuzz.sub-merchant-id=
+app.easebuzz.success-url=http://localhost:5173/payment-success
+app.easebuzz.failure-url=http://localhost:5173/payment-failure
+
+# Logging
+logging.level.root=INFO
+logging.level.com.biryanipos.backend=DEBUG
