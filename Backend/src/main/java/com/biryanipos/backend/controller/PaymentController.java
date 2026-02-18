@@ -4,7 +4,6 @@ import com.biryanipos.backend.dto.BillResponse;
 import com.biryanipos.backend.dto.InitiateDigitalPaymentRequest;
 
 import com.biryanipos.backend.dto.PaymentRequest;
-import com.biryanipos.backend.model.PaymentMode;
 import com.biryanipos.backend.model.Payment;
 import com.biryanipos.backend.service.EasebuzzService;
 import com.biryanipos.backend.service.PaymentService;
@@ -25,9 +24,13 @@ public class PaymentController {
   @PostMapping("/initiate-digital")
   public ResponseEntity<Map<String, Object>> initiateDigitalPayment(
       @RequestBody InitiateDigitalPaymentRequest request) {
+    System.out.println("Initiate Digital Payment - OrderId: " + request.getOrderId() + ", Amount: "
+        + request.getAmount() + ", Metadata: " + request.getMetadata());
     return ResponseEntity.ok(easebuzzService.initiatePayment(
         request.getOrderId(),
-        request.getDiscount() != null ? request.getDiscount() : 0.0));
+        request.getDiscount(),
+        request.getAmount(),
+        request.getMetadata()));
   }
 
   @PostMapping("/easebuzz/success")
@@ -44,14 +47,44 @@ public class PaymentController {
 
         PaymentRequest pr = new PaymentRequest();
         pr.setOrderId(orderId);
-        pr.setPaymentMode(PaymentMode.ONLINE);
-        pr.setDiscount(0.0);
+        pr.setDiscount(0.0); // Discount already applied to order total in initiation
+
+        // Reconstruct split payments from metadata (udf1)
+        java.util.List<PaymentRequest.PaymentModeDetail> modes = new java.util.ArrayList<>();
+        double onlineAmount = 0;
         try {
-          pr.setAmountReceived(Double.parseDouble(payload.getOrDefault("amount", "0")));
+          onlineAmount = Double.parseDouble(payload.getOrDefault("amount", "0"));
         } catch (NumberFormatException e) {
-          pr.setAmountReceived(0);
+          onlineAmount = 0;
         }
-        pr.setTransactionRef(easepayId != null ? easepayId : txnid);
+        modes.add(new PaymentRequest.PaymentModeDetail(com.biryanipos.backend.model.PaymentMode.ONLINE, onlineAmount,
+            easepayId != null ? easepayId : txnid));
+
+        String metadata = payload.get("udf1");
+        // In PaymentController: parse udf1 using ~ and _ separators instead of , and :.
+        // The udf1 is expected to be in the format MODE_AMOUNT~MODE_AMOUNT (e.g.
+        // CASH_772~CARD_100)
+        if (metadata != null && !metadata.isBlank()) {
+          try {
+            // Format: CASH_772~CARD_100 (safe Easebuzz encoding)
+            String[] parts = metadata.split("~");
+            for (String part : parts) {
+              String[] kv = part.split("_", 2);
+              if (kv.length == 2) {
+                try {
+                  modes.add(new PaymentRequest.PaymentModeDetail(
+                      com.biryanipos.backend.model.PaymentMode.valueOf(kv[0]),
+                      Double.parseDouble(kv[1]),
+                      null));
+                } catch (Exception ignore) {
+                }
+              }
+            }
+          } catch (Exception ignore) {
+          }
+        }
+        pr.setPaymentModes(modes);
+        pr.setAmountReceived(modes.stream().mapToDouble(m -> m.getAmount()).sum());
 
         paymentService.processPayment(pr);
 

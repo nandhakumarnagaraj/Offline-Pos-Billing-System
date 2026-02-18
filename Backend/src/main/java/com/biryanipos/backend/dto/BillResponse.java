@@ -13,6 +13,7 @@ public class BillResponse {
   private String customerPhone;
   private String tableNumber;
   private String orderType;
+  private boolean gstEnabled;
 
   private double subtotal;
   private double cgst;

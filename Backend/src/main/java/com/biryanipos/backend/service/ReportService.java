@@ -31,6 +31,8 @@ public class ReportService {
     // Removed activeOrders and todayPayments fetch as they are now aggregated
 
     Double todayRevenue = paymentRepository.sumTotalAmountBetween(todayStart, todayEnd);
+    Double todayTaxable = paymentRepository.sumTaxableRevenueBetween(todayStart, todayEnd);
+    Double todayExempt = paymentRepository.sumExemptRevenueBetween(todayStart, todayEnd);
 
     Double todayExpenses = expenseRepository.sumAmountBetween(LocalDate.now(), LocalDate.now());
 
@@ -82,6 +84,17 @@ public class ReportService {
     dashboard.setLowStockCount(lowStockCount);
     dashboard.setExpiringItemsCount(expiringCount);
     dashboard.setTotalWastageValue(totalWastage);
+    dashboard.setTodayTaxableRevenue(todayTaxable != null ? todayTaxable : 0.0);
+    dashboard.setTodayExemptRevenue(todayExempt != null ? todayExempt : 0.0);
+
+    Double todayCgst = paymentRepository.sumCgstBetween(todayStart, todayEnd);
+    Double todaySgst = paymentRepository.sumSgstBetween(todayStart, todayEnd);
+    double todayOutputGst = (todayCgst != null ? todayCgst : 0) + (todaySgst != null ? todaySgst : 0);
+    Double todayInputGst = expenseRepository.sumGstAmountBetween(LocalDate.now(), LocalDate.now());
+
+    double netRev = (todayRevenue != null ? todayRevenue : 0) - todayOutputGst;
+    double netExp = (todayExpenses != null ? todayExpenses : 0) - (todayInputGst != null ? todayInputGst : 0);
+    dashboard.setNetProfit(netRev - netExp - totalWastage); // Simplified for dashboard
 
     return dashboard;
   }
@@ -131,6 +144,10 @@ public class ReportService {
     long dineInOrders = orderRepository.countByOrderTypeAndCreatedAtBetween(OrderType.DINE_IN, start, end);
     long takeawayOrders = orderRepository.countByOrderTypeAndCreatedAtBetween(OrderType.TAKEAWAY, start, end);
 
+    // Taxable vs Exempt breakdown
+    Double taxableRevenue = paymentRepository.sumTaxableRevenueBetween(start, end);
+    Double exemptRevenue = paymentRepository.sumExemptRevenueBetween(start, end);
+
     // Payment breakdown
     List<Object[]> modeStats = paymentRepository.findPaymentModeBreakdownBetween(start, end);
     Map<String, Double> paymentBreakdown = new HashMap<>();
@@ -173,6 +190,8 @@ public class ReportService {
     report.put("totalRevenue", totalRevenue);
 
     // GST Details for Reconciliation
+    report.put("taxableRevenue", taxableRevenue != null ? taxableRevenue : 0);
+    report.put("exemptRevenue", exemptRevenue != null ? exemptRevenue : 0);
     report.put("outputCgst", totalCgst != null ? totalCgst : 0);
     report.put("outputSgst", totalSgst != null ? totalSgst : 0);
     report.put("outputGst", outputGst);
@@ -183,8 +202,11 @@ public class ReportService {
     report.put("totalExpenses", totalExpenses != null ? totalExpenses : 0);
     report.put("cogs", cogs);
     report.put("wastageValue", wastageValue);
-    report.put("netProfit",
-        (totalRevenue != null ? totalRevenue : 0) - (totalExpenses != null ? totalExpenses : 0) - cogs - wastageValue);
+
+    double netRevenue = (totalRevenue != null ? totalRevenue : 0) - outputGst;
+    double netExpenses = (totalExpenses != null ? totalExpenses : 0) - (inputGst != null ? inputGst : 0);
+
+    report.put("netProfit", netRevenue - netExpenses - cogs - wastageValue);
     report.put("topItems", topItems);
     report.put("paymentBreakdown", paymentBreakdown);
     report.put("waiterPerformance", waiterPerformance);
@@ -198,7 +220,7 @@ public class ReportService {
     List<Payment> payments = paymentRepository.findCompletedPaymentsBetween(start, end);
 
     StringBuilder csv = new StringBuilder();
-    csv.append("Date,Invoice No,Customer,Total Amount,Taxable Value,CGST,SGST,Total GST,Payment Mode\n");
+    csv.append("Date,Invoice No,Customer,Total Amount,Taxable Value,CGST,SGST,Total GST,Payment Mode,GST Status\n");
 
     for (Payment p : payments) {
       Long orderId = p.getOrderId();
@@ -217,7 +239,8 @@ public class ReportService {
           .append(p.getCgst()).append(",")
           .append(p.getSgst()).append(",")
           .append(p.getCgst() + p.getSgst()).append(",")
-          .append(p.getPaymentMode()).append("\n");
+          .append(p.getPaymentMode()).append(",")
+          .append(p.isGstEnabled() ? "GST" : "Non-GST").append("\n");
     }
     return csv.toString();
   }

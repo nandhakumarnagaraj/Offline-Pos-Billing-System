@@ -48,6 +48,7 @@ public class Order {
   private double sgst; // State GST
   private double totalAmount; // subtotal + cgst + sgst
   private double discount;
+  private boolean gstEnabled = false; // NEW: Toggle per order
 
   // Freeze logic: true = order cannot be modified (items can still be added
   // separately)

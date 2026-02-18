@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +23,12 @@ public class ConfigurationService {
 
   @PostConstruct
   public void init() {
+    try {
+      configRepository.fixColumnLength();
+      log.info("Database column for AppConfig expanded to LONGTEXT.");
+    } catch (Exception e) {
+      log.warn("Could not modify column length (possible already modified or not MySQL): {}", e.getMessage());
+    }
     refreshProperties();
   }
 
@@ -54,12 +59,31 @@ public class ConfigurationService {
       appProperties.getShop().setAddress(configMap.get("shop.address"));
     if (configMap.containsKey("shop.phone"))
       appProperties.getShop().setPhone(configMap.get("shop.phone"));
+    if (configMap.containsKey("shop.whatsapp"))
+      appProperties.getShop().setWhatsapp(configMap.get("shop.whatsapp"));
     if (configMap.containsKey("shop.gstin"))
       appProperties.getShop().setGstin(configMap.get("shop.gstin"));
+    if (configMap.containsKey("shop.fssai"))
+      appProperties.getShop().setFssai(configMap.get("shop.fssai"));
+    if (configMap.containsKey("shop.tagline"))
+      appProperties.getShop().setTagline(configMap.get("shop.tagline"));
+    if (configMap.containsKey("shop.footerMessage"))
+      appProperties.getShop().setFooterMessage(configMap.get("shop.footerMessage"));
+    if (configMap.containsKey("shop.softwareBy"))
+      appProperties.getShop().setSoftwareBy(configMap.get("shop.softwareBy"));
+    if (configMap.containsKey("shop.logoUrl"))
+      appProperties.getShop().setLogoUrl(configMap.get("shop.logoUrl"));
 
     // Tax
-    if (configMap.containsKey("tax.defaultGstPercent"))
-      appProperties.getTax().setDefaultGstPercent(Double.parseDouble(configMap.get("tax.defaultGstPercent")));
+    try {
+      if (configMap.containsKey("tax.defaultGstPercent") && !configMap.get("tax.defaultGstPercent").isEmpty())
+        appProperties.getTax().setDefaultGstPercent(Double.parseDouble(configMap.get("tax.defaultGstPercent")));
+    } catch (Exception e) {
+      log.warn("Invalid tax.defaultGstPercent: {}", configMap.get("tax.defaultGstPercent"));
+    }
+
+    if (configMap.containsKey("tax.enabled"))
+      appProperties.getTax().setEnabled(Boolean.parseBoolean(configMap.get("tax.enabled")));
 
     // Order
     if (configMap.containsKey("order.defaultPrepTimeMinutes"))
@@ -74,11 +98,22 @@ public class ConfigurationService {
 
   @Transactional
   public void updateConfig(String key, String value) {
+    saveConfig(key, value);
+    refreshProperties();
+  }
+
+  @Transactional
+  public void updateConfigs(Map<String, String> configs) {
+    configs.forEach(this::saveConfig);
+    refreshProperties();
+  }
+
+  private void saveConfig(String key, String value) {
+    String category = key.contains(".") ? key.split("\\.")[0].toUpperCase() : "GENERAL";
     AppConfig config = configRepository.findById(key)
-        .orElse(new AppConfig(key, value, null, key.split("\\.")[0].toUpperCase()));
+        .orElse(new AppConfig(key, value, null, category));
     config.setConfigValue(value);
     configRepository.save(config);
-    refreshProperties();
   }
 
   public Map<String, String> getAllConfigs() {

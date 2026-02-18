@@ -13,20 +13,22 @@ export const ConfigProvider = ({ children }) => {
       try {
         const remoteConfig = await configService.fetchConfig();
         if (remoteConfig) {
-          // Flatten AppProperties to match local shopConfig structure or use directly
           const merged = {
             ...localDefaults,
-            name: remoteConfig.shop.name || localDefaults.name,
-            address: remoteConfig.shop.address ? remoteConfig.shop.address.split(', ') : localDefaults.address,
+            name: remoteConfig['shop.name'] || localDefaults.name,
+            address: remoteConfig['shop.address'] ? remoteConfig['shop.address'].split('\n') : localDefaults.address,
             contact: {
-              phone: remoteConfig.shop.phone || localDefaults.contact.phone,
-              whatsapp: remoteConfig.shop.whatsapp || localDefaults.contact.whatsapp
+              phone: remoteConfig['shop.phone'] || localDefaults.contact.phone,
+              whatsapp: remoteConfig['shop.whatsapp'] || localDefaults.contact.whatsapp
             },
-            gstin: remoteConfig.shop.gstin || localDefaults.gstin,
-            fssai: remoteConfig.shop.fssai || localDefaults.fssai,
-            gstPercentage: remoteConfig.tax.defaultGstPercent || localDefaults.gstPercentage,
-            tagline: remoteConfig.shop.tagline || localDefaults.tagline,
-            footerMessage: remoteConfig.shop.footerMessage || localDefaults.footerMessage
+            gstin: remoteConfig['shop.gstin'] || localDefaults.gstin,
+            fssai: remoteConfig['shop.fssai'] || localDefaults.fssai,
+            gstEnabled: remoteConfig['tax.enabled'] === 'true',
+            gstPercentage: parseFloat(remoteConfig['tax.defaultGstPercent']) || localDefaults.gstPercentage,
+            tagline: remoteConfig['shop.tagline'] || localDefaults.tagline,
+            footerMessage: remoteConfig['shop.footerMessage'] || localDefaults.footerMessage,
+            logo: remoteConfig['shop.logoUrl'] || localDefaults.logo,
+            softwareBy: remoteConfig['shop.softwareBy'] || localDefaults.softwareBy
           };
           setConfig(merged);
         }
@@ -45,17 +47,20 @@ export const ConfigProvider = ({ children }) => {
     if (remoteConfig) {
       const merged = {
         ...localDefaults,
-        name: remoteConfig.shop.name || localDefaults.name,
-        address: remoteConfig.shop.address ? remoteConfig.shop.address.split(', ') : localDefaults.address,
+        name: remoteConfig['shop.name'] || localDefaults.name,
+        address: remoteConfig['shop.address'] ? remoteConfig['shop.address'].split('\n') : localDefaults.address,
         contact: {
-          phone: remoteConfig.shop.phone || localDefaults.contact.phone,
-          whatsapp: remoteConfig.shop.whatsapp || localDefaults.contact.whatsapp
+          phone: remoteConfig['shop.phone'] || localDefaults.contact.phone,
+          whatsapp: remoteConfig['shop.whatsapp'] || localDefaults.contact.whatsapp
         },
-        gstin: remoteConfig.shop.gstin || localDefaults.gstin,
-        fssai: remoteConfig.shop.fssai || localDefaults.fssai,
-        gstPercentage: remoteConfig.tax.defaultGstPercent || localDefaults.gstPercentage,
-        tagline: remoteConfig.shop.tagline || localDefaults.tagline,
-        footerMessage: remoteConfig.shop.footerMessage || localDefaults.footerMessage
+        gstin: remoteConfig['shop.gstin'] || localDefaults.gstin,
+        fssai: remoteConfig['shop.fssai'] || localDefaults.fssai,
+        gstEnabled: remoteConfig['tax.enabled'] === 'true',
+        gstPercentage: parseFloat(remoteConfig['tax.defaultGstPercent']) || localDefaults.gstPercentage,
+        tagline: remoteConfig['shop.tagline'] || localDefaults.tagline,
+        footerMessage: remoteConfig['shop.footerMessage'] || localDefaults.footerMessage,
+        logo: remoteConfig['shop.logoUrl'] || localDefaults.logo,
+        softwareBy: remoteConfig['shop.softwareBy'] || localDefaults.softwareBy
       };
       setConfig(merged);
     }

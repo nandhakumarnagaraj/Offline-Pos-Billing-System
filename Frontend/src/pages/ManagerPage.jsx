@@ -13,7 +13,8 @@ import {
   getAllUsers, createUser, resetUserPassword, toggleUserActive,
   getExpiringStockItems, getAllSuppliers, getAllRecipeCosting,
   getExpensesBySupplier,
-  updateRecipe, removeRecipeIngredient, clearRecipe
+  updateRecipe, removeRecipeIngredient, clearRecipe,
+  updateBatchConfigs, getConfig, getCurrentConfig
 } from '../service/api';
 import { connectWebSocket } from '../service/ws';
 import { useAuth } from '../context/AuthContext';
@@ -29,7 +30,7 @@ const VARIATION_UNITS = ['Cms', 'Piece', 'scoop', 'grams', 'inches', 'ml', 'ounc
 
 function ManagerPage() {
   const { logout, user } = useAuth();
-  const { config: shopConfig } = useConfig();
+  const { config: shopConfig, refreshConfig } = useConfig();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboard, setDashboard] = useState(null);
@@ -57,6 +58,12 @@ function ManagerPage() {
   // Menu Filtering
   const [menuSearchQuery, setMenuSearchQuery] = useState('');
   const [menuActiveCategory, setMenuActiveCategory] = useState('All');
+
+  const [storeConfig, setStoreConfig] = useState({
+    name: '', address: '', phone: '', whatsapp: '', gstin: '', fssai: '',
+    tagline: '', footerMessage: '', logoUrl: '', softwareBy: '',
+    taxEnabled: true, defaultGstPercent: 5
+  });
 
   // Forms
   const [newItem, setNewItem] = useState({
@@ -265,6 +272,74 @@ function ManagerPage() {
     if (tab === 'reports') loadReport();
     if (tab === 'dashboard') loadDashboard();
     if (tab === 'recipes') loadRecipeCosts();
+    if (tab === 'store') loadStoreConfig();
+  };
+
+  const loadStoreConfig = async () => {
+    setLoading(true);
+    try {
+      const res = await getConfig();
+      const data = res.data;
+      setStoreConfig({
+        name: data['shop.name'] || '',
+        address: data['shop.address'] || '',
+        phone: data['shop.phone'] || '',
+        whatsapp: data['shop.whatsapp'] || '',
+        gstin: data['shop.gstin'] || '',
+        fssai: data['shop.fssai'] || '',
+        tagline: data['shop.tagline'] || '',
+        footerMessage: data['shop.footerMessage'] || '',
+        logoUrl: data['shop.logoUrl'] || '',
+        softwareBy: data['shop.softwareBy'] || '',
+        taxEnabled: data['tax.enabled'] === 'true',
+        defaultGstPercent: parseFloat(data['tax.defaultGstPercent']) || 5
+      });
+    } catch (err) {
+      console.error("Load config error:", err);
+      toast.error("Failed to load settings from server");
+    }
+    setLoading(false);
+  };
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setStoreConfig(prev => ({ ...prev, logoUrl: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveStoreConfig = async () => {
+    setLoading(true);
+    try {
+      const payload = {
+        'shop.name': storeConfig.name,
+        'shop.address': storeConfig.address,
+        'shop.phone': storeConfig.phone,
+        'shop.whatsapp': storeConfig.whatsapp,
+        'shop.gstin': storeConfig.gstin,
+        'shop.fssai': storeConfig.fssai,
+        'shop.tagline': storeConfig.tagline,
+        'shop.footerMessage': storeConfig.footerMessage,
+        'shop.logoUrl': storeConfig.logoUrl,
+        'shop.softwareBy': storeConfig.softwareBy,
+        'tax.enabled': String(storeConfig.taxEnabled),
+        'tax.defaultGstPercent': String(storeConfig.defaultGstPercent)
+      };
+
+      console.log("Saving store config...", payload);
+      await updateBatchConfigs(payload);
+      await refreshConfig();
+      toast.success('Store configuration updated successfully!');
+    } catch (err) {
+      console.error("Config update error:", err);
+      const serverMsg = err.response?.data?.message || err.response?.data || err.message;
+      toast.error(`Update Failed: ${serverMsg}`);
+    }
+    setLoading(false);
   };
 
   const loadRecipeCosts = async () => {
@@ -523,7 +598,7 @@ function ManagerPage() {
           <Link to="/" className="sidebar-logo">
             <img src={shopConfig.logo} alt={shopConfig.name} style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
           </Link>
-          <span className="sidebar-title">{shopConfig.softwareName}</span>
+          <span className="sidebar-title">{shopConfig.name}</span>
         </div>
         <nav className="sidebar-nav">
           {[
@@ -535,6 +610,7 @@ function ManagerPage() {
             { id: 'recipes', icon: '🥘', label: 'Recipes' },
             { id: 'expenses', icon: '💸', label: 'Expenses' },
             { id: 'reports', icon: '📈', label: 'Reports' },
+            { id: 'store', icon: '🏪', label: 'Store' },
           ].map(tab => (
             <button key={tab.id}
               className={`sidebar-btn ${activeTab === tab.id ? 'active' : ''}`}
@@ -594,6 +670,26 @@ function ManagerPage() {
                 {(!dashboard.paymentModeBreakdown || Object.keys(dashboard.paymentModeBreakdown).length === 0) && (
                   <div className="empty-state-sm">No payments today</div>
                 )}
+              </div>
+
+              <div className="glass-card dash-section">
+                <h3>⚖️ GST Summary (Today)</h3>
+                <div className="pay-mode-row">
+                  <span>Taxable Revenue</span>
+                  <span className="pay-amt">₹{dashboard.todayTaxableRevenue?.toFixed(0)}</span>
+                </div>
+                <div className="pay-mode-row">
+                  <span>Exempt Revenue</span>
+                  <span className="pay-amt">₹{dashboard.todayExemptRevenue?.toFixed(0)}</span>
+                </div>
+                <div className="pay-mode-row" style={{ borderTop: '1px solid var(--border)', marginTop: '8px', paddingTop: '8px' }}>
+                  <span>Total Today</span>
+                  <span className="pay-amt" style={{ color: 'var(--primary-light)' }}>₹{dashboard.todayRevenue?.toFixed(0)}</span>
+                </div>
+                <div className="pay-mode-row">
+                  <span style={{ fontWeight: 600 }}>Net Profit (Est.)</span>
+                  <span className="pay-amt" style={{ color: '#10b981', fontWeight: 700 }}>₹{dashboard.netProfit?.toFixed(0)}</span>
+                </div>
               </div>
 
               <div className="glass-card dash-section">
@@ -1320,8 +1416,12 @@ function ManagerPage() {
                       <div className="metric-value">₹{salesReport.totalRevenue?.toFixed(2)}</div>
                     </div>
                     <div className="metric-card">
-                      <div className="metric-label">Net Profit</div>
-                      <div className="metric-value text-success">₹{salesReport.netProfit?.toFixed(2)}</div>
+                      <div className="metric-label">Taxable Sales</div>
+                      <div className="metric-value">₹{salesReport.taxableRevenue?.toFixed(2)}</div>
+                    </div>
+                    <div className="metric-card">
+                      <div className="metric-label">Exempt Sales</div>
+                      <div className="metric-value">₹{salesReport.exemptRevenue?.toFixed(2)}</div>
                     </div>
                     <div className="metric-card">
                       <div className="metric-label">Total Gst</div>
@@ -1408,6 +1508,101 @@ function ManagerPage() {
               )}
             </div>
           )
+        }
+
+        {/* STORE SETTINGS */}
+        {activeTab === 'store' && (
+          <div className="m-section animate-fadeIn">
+            <h2>Store Configuration</h2>
+            <div className="glass-card store-settings-panel">
+              <div className="form-grid">
+                <div className="form-column">
+                  <div className="form-group">
+                    <label>Shop Name</label>
+                    <input className="input" value={storeConfig.name}
+                      onChange={e => setStoreConfig({ ...storeConfig, name: e.target.value })}
+                      placeholder="e.g. Biryani POS" />
+                  </div>
+                  <div className="form-group">
+                    <label>Logo</label>
+                    <div className="logo-upload-container">
+                      {storeConfig.logoUrl && (
+                        <img src={storeConfig.logoUrl} alt="Preview" className="logo-preview-sm" style={{ width: '100px', height: '100px', objectFit: 'contain', marginBottom: '10px' }} />
+                      )}
+                      <input type="file" accept="image/*" onChange={handleLogoUpload} className="file-input" />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Tagline</label>
+                    <input className="input" value={storeConfig.tagline}
+                      onChange={e => setStoreConfig({ ...storeConfig, tagline: e.target.value })}
+                      placeholder="Your shop's slogan" />
+                  </div>
+                  <div className="form-group">
+                    <label>Footer Message</label>
+                    <input className="input" value={storeConfig.footerMessage}
+                      onChange={e => setStoreConfig({ ...storeConfig, footerMessage: e.target.value })}
+                      placeholder="e.g. Thank you for visiting!" />
+                  </div>
+                  <div className="form-group">
+                    <label>Software By</label>
+                    <input className="input" value={storeConfig.softwareBy}
+                      onChange={e => setStoreConfig({ ...storeConfig, softwareBy: e.target.value })}
+                      placeholder="Powered by..." />
+                  </div>
+                </div>
+
+                <div className="form-column">
+                  <div className="form-group">
+                    <label>Address (One line per row)</label>
+                    <textarea className="input" rows="3" value={storeConfig.address}
+                      onChange={e => setStoreConfig({ ...storeConfig, address: e.target.value })}
+                      placeholder="123 Main St&#10;City, State&#10;Pin Code" />
+                  </div>
+                  <div className="form-group">
+                    <label>Phone Number</label>
+                    <input className="input" value={storeConfig.phone}
+                      onChange={e => setStoreConfig({ ...storeConfig, phone: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>WhatsApp Number</label>
+                    <input className="input" value={storeConfig.whatsapp}
+                      onChange={e => setStoreConfig({ ...storeConfig, whatsapp: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>GSTIN</label>
+                    <input className="input" value={storeConfig.gstin}
+                      onChange={e => setStoreConfig({ ...storeConfig, gstin: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>FSSAI No</label>
+                    <input className="input" value={storeConfig.fssai}
+                      onChange={e => setStoreConfig({ ...storeConfig, fssai: e.target.value })} />
+                  </div>
+
+                  <div className="form-group" style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '8px' }}>
+                    <h4 style={{ marginBottom: '10px' }}>Tax Settings</h4>
+                    <label className="checkbox-label" style={{ marginBottom: '10px' }}>
+                      <input type="checkbox" checked={storeConfig.taxEnabled}
+                        onChange={e => setStoreConfig({ ...storeConfig, taxEnabled: e.target.checked })} />
+                      Enable GST on Bills
+                    </label>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Default GST Percentage (%)</label>
+                      <input className="input" type="number" step="0.5" value={storeConfig.defaultGstPercent}
+                        onChange={e => setStoreConfig({ ...storeConfig, defaultGstPercent: e.target.value })} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="store-footer-actions">
+                <button className="btn btn-primary btn-lg" onClick={handleSaveStoreConfig} style={{ width: '100%', marginTop: '20px' }}>
+                  💾 Save Configuration
+                </button>
+              </div>
+            </div>
+          </div>
+        )
         }
 
         {/* RECIPES */}

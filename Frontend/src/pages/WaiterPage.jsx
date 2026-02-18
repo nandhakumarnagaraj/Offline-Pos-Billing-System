@@ -38,6 +38,7 @@ function WaiterPage() {
   const [upiId, setUpiId] = useState('');
   const [qrCodeData, setQrCodeData] = useState(null);
   const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [multiPayMode, setMultiPayMode] = useState('CASH');
 
   useEffect(() => {
     loadData();
@@ -66,12 +67,13 @@ function WaiterPage() {
 
   useEffect(() => {
     const { total } = calculateBill();
-    if (paymentMode === 'CASH' && total) {
+    // Only prefill in Single Payment mode (where isMultiPay is false)
+    if (!isMultiPay && paymentMode === 'CASH' && total) {
       setAmountReceived(total.toFixed(2));
-    } else {
+    } else if (!isMultiPay) {
       setAmountReceived('');
     }
-  }, [paymentMode, billData, discount]);
+  }, [paymentMode, billData, discount, isMultiPay]);
 
   const loadData = async () => {
     try {
@@ -237,8 +239,9 @@ function WaiterPage() {
 
   const handlePayment = async () => {
     if (!selectedOrder) return;
-    if (!whatsappPhone || whatsappPhone.trim().length < 10) {
-      toast.error('Customer WhatsApp number is required for digital billing');
+    const isOnline = !isMultiPay ? (paymentMode === 'ONLINE') : addedPayments.some(p => p.mode === 'ONLINE');
+    if (isOnline && (!whatsappPhone || whatsappPhone.trim().length < 10)) {
+      toast.error('Customer WhatsApp number is required for digital payments');
       return;
     }
     setLoading(true);
@@ -257,9 +260,50 @@ function WaiterPage() {
         payload.amountReceived = parseFloat(amountReceived) || 0;
       }
 
-      if (paymentMode === 'ONLINE' || paymentMode === 'UPI_ID' || paymentMode === 'UPI_SCAN') {
+      // Compute the total bill amount fresh (not from stale calc)
+      const disc = parseFloat(discount) || 0;
+      let freshTotal = 0;
+      if (billData) {
+        let totalCgst = 0, totalSgst = 0;
+        billData.items?.forEach(item => {
+          const itemGst = item.gstPercent || shopConfig.gstPercentage;
+          const itemTax = (item.total * (itemGst / 100));
+          totalCgst += itemTax / 2;
+          totalSgst += itemTax / 2;
+        });
+        const sub = billData.subtotal - disc;
+        const cgst = shopConfig.gstEnabled ? Math.round(totalCgst * 100) / 100 : 0;
+        const sgst = shopConfig.gstEnabled ? Math.round(totalSgst * 100) / 100 : 0;
+        freshTotal = Math.round(sub + cgst + sgst);
+      }
+
+      // Check if digital payment is needed
+      let onlinePay = isMultiPay ? addedPayments.find(p => p.mode === 'ONLINE') : null;
+
+      // If in Split Mode and Easebuzz is selected in dropdown but NOT added to list yet,
+      // compute remaining balance directly from addedPayments
+      if (isMultiPay && !onlinePay && multiPayMode === 'ONLINE') {
+        const totalPaidSoFar = addedPayments.reduce((sum, p) => sum + p.amount, 0);
+        const remaining = Math.max(0, freshTotal - totalPaidSoFar);
+        if (remaining > 0) {
+          onlinePay = { mode: 'ONLINE', amount: remaining };
+        }
+      }
+
+      const isDigital = (!isMultiPay && paymentMode === 'ONLINE') || (isMultiPay && onlinePay);
+
+      if (isDigital) {
         try {
-          const res = await initiateDigitalPayment(selectedOrder.id, parseFloat(discount) || 0, 'ONLINE');
+          const splitAmt = isMultiPay ? onlinePay.amount : freshTotal;
+          // Metadata: all non-ONLINE payments in the addedPayments list
+          const nonOnlineParts = addedPayments.filter(p => p.mode !== 'ONLINE');
+          const metadata = isMultiPay && nonOnlineParts.length > 0
+            ? nonOnlineParts.map(p => `${p.mode}:${p.amount}`).join(',')
+            : '';
+
+          console.log('[Split Payment] splitAmt:', splitAmt, '| metadata:', metadata, '| freshTotal:', freshTotal, '| addedPayments:', addedPayments);
+
+          const res = await initiateDigitalPayment(selectedOrder.id, disc, 'ONLINE', splitAmt, metadata);
 
           if (res.data.status === 'success') {
             const capturedOrderId = selectedOrder.id;
@@ -369,8 +413,8 @@ function WaiterPage() {
     });
 
     const sub = billData.subtotal - disc;
-    const cgst = Math.round(totalCgst * 100) / 100;
-    const sgst = Math.round(totalSgst * 100) / 100;
+    const cgst = shopConfig.gstEnabled ? Math.round(totalCgst * 100) / 100 : 0;
+    const sgst = shopConfig.gstEnabled ? Math.round(totalSgst * 100) / 100 : 0;
     const total = Math.round(sub + cgst + sgst);
     const received = parseFloat(amountReceived) || 0;
     const change = received > total ? received - total : 0;
@@ -635,8 +679,12 @@ function WaiterPage() {
                   {parseFloat(discount) > 0 && (
                     <div className="bill-row discount"><span>Discount</span><span>-₹{parseFloat(discount).toFixed(2)}</span></div>
                   )}
-                  <div className="bill-row"><span>CGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.cgst?.toFixed(2)}</span></div>
-                  <div className="bill-row"><span>SGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.sgst?.toFixed(2)}</span></div>
+                  {shopConfig.gstEnabled && (
+                    <>
+                      <div className="bill-row"><span>CGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.cgst?.toFixed(2)}</span></div>
+                      <div className="bill-row"><span>SGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.sgst?.toFixed(2)}</span></div>
+                    </>
+                  )}
                   <div className="bill-row bill-grand-total">
                     <span>Grand Total</span>
                     <span>₹{calc.total?.toFixed(2)}</span>
@@ -648,34 +696,41 @@ function WaiterPage() {
               <div className="payment-panel glass-card">
                 <div className="flex-between">
                   <h3>Payment</h3>
-                  <button className="btn btn-xs btn-outline" onClick={() => { setIsMultiPay(!isMultiPay); setAddedPayments([]); }}>
-                    {isMultiPay ? 'Switch to Single Mode' : 'Enable Split Payment'}
-                  </button>
                 </div>
 
-                {!isMultiPay ? (
+                {paymentMode !== 'SPLIT' ? (
                   <>
                     <div className="payment-modes">
-                      {['CASH', 'ONLINE', 'UPI_ID', 'UPI_SCAN'].map(mode => (
+                      {['CASH', 'ONLINE', 'SPLIT'].map(mode => (
                         <button key={mode}
                           className={`payment-mode-btn ${paymentMode === mode ? 'active' : ''}`}
-                          onClick={() => setPaymentMode(mode)}>
+                          onClick={() => {
+                            setPaymentMode(mode);
+                            if (mode === 'SPLIT') {
+                              setIsMultiPay(true);
+                              setAddedPayments([]);
+                            } else {
+                              setIsMultiPay(false);
+                            }
+                          }}>
                           <span className="mode-icon">
-                            {mode === 'CASH' ? '💵' : mode === 'ONLINE' ? '🌐' : '📱'}
+                            {mode === 'CASH' ? '💵' : mode === 'ONLINE' ? '🌐' : '⚖️'}
                           </span>
                           <span className="mode-name">
-                            {mode === 'ONLINE' ? 'Easebuzz' : mode.replace('_', ' ')}
+                            {mode === 'ONLINE' ? 'Easebuzz' : mode === 'SPLIT' ? 'Split Payment' : mode}
                           </span>
                         </button>
                       ))}
                     </div>
 
                     <div className="payment-fields">
-                      <div className="whatsapp-field" style={{ marginBottom: '16px' }}>
-                        <label>Customer WhatsApp <span style={{ color: '#EF4444' }}>*</span></label>
-                        <input className="input" type="text" placeholder="10-digit number" value={whatsappPhone}
-                          onChange={e => setWhatsappPhone(e.target.value)} required />
-                      </div>
+                      {paymentMode === 'ONLINE' && (
+                        <div className="whatsapp-field" style={{ marginBottom: '16px' }}>
+                          <label>Customer WhatsApp <span style={{ color: '#EF4444' }}>*</span></label>
+                          <input className="input" type="text" placeholder="10-digit number" value={whatsappPhone}
+                            onChange={e => setWhatsappPhone(e.target.value)} required />
+                        </div>
+                      )}
 
                       <label>Discount (₹)</label>
                       <input className="input" type="number" placeholder="0" value={discount}
@@ -693,31 +748,32 @@ function WaiterPage() {
                           )}
                         </>
                       )}
-
-                      {paymentMode === 'UPI_ID' && (
-                        <>
-                          <label>Enter Customer UPI ID</label>
-                          <input className="input" type="text" placeholder="e.g., customer@bank" value={upiId}
-                            onChange={e => setUpiId(e.target.value)} />
-                        </>
-                      )}
-
-                      {paymentMode === 'UPI_SCAN' && (
-                        <>
-                          <label>Scan QR for Payment</label>
-                          {qrCodeData ? (
-                            <div className="qr-code-display" style={{ padding: '10px', background: 'white', borderRadius: '8px', display: 'flex', justifyContent: 'center' }}>
-                              <img src={qrCodeData} alt="Scan to Pay" style={{ width: '150px', height: '150px' }} />
-                            </div>
-                          ) : (
-                            <div className="empty-state-sm">Click "Settle Bill" to generate QR</div>
-                          )}
-                        </>
-                      )}
                     </div>
                   </>
                 ) : (
                   <div className="multi-pay-section animate-fadeIn">
+                    <div className="payment-modes" style={{ marginBottom: '20px' }}>
+                      {['CASH', 'ONLINE', 'SPLIT'].map(mode => (
+                        <button key={mode}
+                          className={`payment-mode-btn ${paymentMode === mode ? 'active' : ''}`}
+                          onClick={() => {
+                            setPaymentMode(mode);
+                            if (mode === 'SPLIT') {
+                              setIsMultiPay(true);
+                            } else {
+                              setIsMultiPay(false);
+                              setAddedPayments([]);
+                            }
+                          }}>
+                          <span className="mode-icon">
+                            {mode === 'CASH' ? '💵' : mode === 'ONLINE' ? '🌐' : '⚖️'}
+                          </span>
+                          <span className="mode-name">
+                            {mode === 'ONLINE' ? 'Easebuzz' : mode === 'SPLIT' ? 'Split Payment' : mode}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                     <label>Discount (₹)</label>
                     <input className="input" type="number" placeholder="0" value={discount}
                       onChange={e => setDiscount(e.target.value)} />
@@ -730,17 +786,22 @@ function WaiterPage() {
                     </div>
 
                     <div className="add-payment-row">
-                      <select className="input" value={paymentMode} onChange={e => setPaymentMode(e.target.value)}>
+                      <select className="input" value={multiPayMode} onChange={e => {
+                        const val = e.target.value;
+                        setMultiPayMode(val);
+                        if (val === 'ONLINE') {
+                          setAmountReceived(calc.multiPayRemaining.toFixed(2));
+                        }
+                      }}>
                         <option value="CASH">Cash</option>
-                        <option value="UPI_ID">UPI ID</option>
-                        <option value="UPI_SCAN">UPI Scan</option>
+                        <option value="ONLINE">Easebuzz</option>
                       </select>
                       <input className="input" type="number" placeholder="Amount"
                         value={amountReceived} onChange={e => setAmountReceived(e.target.value)} />
                       <button className="btn btn-sm btn-primary" onClick={() => {
-                        if (!amountReceived || parseFloat(amountReceived) <= 0) return;
                         const amt = parseFloat(amountReceived);
-                        setAddedPayments([...addedPayments, { mode: paymentMode, amount: amt }]);
+                        if (isNaN(amt) || amt <= 0) return;
+                        setAddedPayments([...addedPayments, { mode: multiPayMode, amount: amt }]);
                         setAmountReceived('');
                       }} disabled={!amountReceived}>Add</button>
                     </div>
@@ -753,8 +814,14 @@ function WaiterPage() {
                     Cancel
                   </button>
                   <button className="btn btn-success btn-lg" onClick={handlePayment}
-                    disabled={loading || (isMultiPay && calc.multiPayRemaining > 0)}>
-                    {loading ? '⏳ Processing...' : (isMultiPay ? '✅ Settle Bill' : `✅ Pay ₹${calc.total?.toFixed(2)}`)}
+                    disabled={loading || (isMultiPay && calc.multiPayRemaining > 0 && multiPayMode !== 'ONLINE')}>
+                    {loading ? '⏳ Processing...' : (
+                      isMultiPay
+                        ? (multiPayMode === 'ONLINE' && calc.multiPayRemaining > 0
+                          ? `✅ Settle (₹${calc.multiPayRemaining.toFixed(2)} via Easebuzz)`
+                          : '✅ Settle Bill')
+                        : `✅ Pay ₹${calc.total?.toFixed(2)}`
+                    )}
                   </button>
                 </div>
               </div>
@@ -785,7 +852,7 @@ function WaiterPage() {
       </Modal>
 
       {loading && <LoadingOverlay message="Processing Order..." />}
-    </div>
+    </div >
   );
 }
 

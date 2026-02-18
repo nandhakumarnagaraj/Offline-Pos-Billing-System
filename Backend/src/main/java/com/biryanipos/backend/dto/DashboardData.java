@@ -14,12 +14,15 @@ public class DashboardData {
   private int todayOrders;
   private int activeOrders;
   private double todayExpenses;
+  private double todayTaxableRevenue;
+  private double todayExemptRevenue;
   private List<TopSellingItem> topSellingItems;
   private Map<String, Double> paymentModeBreakdown;
   private List<RecentOrder> recentOrders;
   private int lowStockCount;
   private int expiringItemsCount;
   private double totalWastageValue;
+  private double netProfit;
 
   @Data
   @AllArgsConstructor

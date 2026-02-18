@@ -40,6 +40,11 @@ public class PaymentService {
       throw new RuntimeException("Order already paid");
     }
 
+    // Support on-the-fly GST toggle
+    if (request.getGstEnabled() != null) {
+      order.setGstEnabled(request.getGstEnabled());
+    }
+
     double subtotal = order.getSubtotal();
     double discount = request.getDiscount();
     double discountedSubtotal = subtotal - discount;
@@ -47,7 +52,7 @@ public class PaymentService {
     double cgst = 0;
     double sgst = 0;
 
-    if (appProperties.getTax().isEnabled()) {
+    if (order.isGstEnabled() && appProperties.getTax().isEnabled()) {
       // Proportional GST adjustment: if subtotal is $100 and CGST is $5,
       // and we give $10 discount ($90 new subtotal), then new CGST is $5 * (90/100) =
       double taxFactor = subtotal > 0 ? (discountedSubtotal / subtotal) : 1.0;
@@ -65,6 +70,7 @@ public class PaymentService {
     payment.setSgst(sgst);
     payment.setTotalAmount(totalAmount);
     payment.setDiscount(discount);
+    payment.setGstEnabled(order.isGstEnabled());
     payment.setTransactionRef(request.getTransactionRef());
     payment.setPaidAt(LocalDateTime.now());
 
@@ -164,6 +170,7 @@ public class PaymentService {
     bill.setCustomerPhone(order.getCustomerPhone());
     bill.setTableNumber(order.getTableNumber());
     bill.setOrderType(order.getOrderType().name());
+    bill.setGstEnabled(order.isGstEnabled());
     bill.setSubtotal(order.getSubtotal());
     bill.setCgst(order.getCgst());
     bill.setSgst(order.getSgst());

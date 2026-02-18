@@ -20,7 +20,7 @@ public class EasebuzzService {
   private final AppProperties appProperties;
   private final OrderRepository orderRepository;
 
-  public Map<String, Object> initiatePayment(Long orderId, double discount) {
+  public Map<String, Object> initiatePayment(Long orderId, Double discount, Double explicitAmount, String metadata) {
     Order order = orderRepository.findById(Objects.requireNonNull(orderId))
         .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
 
@@ -28,7 +28,18 @@ public class EasebuzzService {
     validateConfig(config);
 
     String txnid = generateTxnId(order.getId());
-    String amount = String.format(Locale.US, "%.2f", computePayableAmount(order, discount));
+
+    double finalAmountValue;
+    if (explicitAmount != null && explicitAmount > 0.01) {
+      log.info("Using explicit amount for Easebuzz: {} (Order: {})", explicitAmount, orderId);
+      finalAmountValue = explicitAmount;
+    } else {
+      double payable = computePayableAmount(order, discount != null ? discount : 0.0);
+      log.info("Using computed payable amount for Easebuzz: {} (Order: {})", payable, orderId);
+      finalAmountValue = payable;
+    }
+
+    String amount = String.format(Locale.US, "%.2f", finalAmountValue);
     String productinfo = "Order" + order.getId();
     String firstname = (order.getCustomerName() != null && !order.getCustomerName().trim().isEmpty())
         ? order.getCustomerName().trim()
@@ -42,10 +53,19 @@ public class EasebuzzService {
     String surl = config.getSuccessUrl();
     String furl = config.getFailureUrl();
 
+    // Encode metadata safely for Easebuzz udf1 (only alphanumeric, underscore,
+    // tilde allowed)
+    // Input format: CASH:772,CARD:100
+    // Encoded format: CASH_772~CARD_100
+    String udf1 = "";
+    if (metadata != null && !metadata.isBlank()) {
+      udf1 = metadata.replace(':', '_').replace(',', '~');
+    }
+
     // Hash Sequence:
     // key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5|udf6|udf7|udf8|udf9|udf10|salt
     String hashSequence = config.getKey() + "|" + txnid + "|" + amount + "|" + productinfo + "|"
-        + firstname + "|" + email + "|||||||||||" + config.getSalt();
+        + firstname + "|" + email + "|" + udf1 + "||||||||||" + config.getSalt();
     String hash = generateSHA512(hashSequence);
 
     Map<String, String> fields = new HashMap<>();
@@ -59,6 +79,7 @@ public class EasebuzzService {
     fields.put("surl", surl);
     fields.put("furl", furl);
     fields.put("hash", hash);
+    fields.put("udf1", udf1);
 
     if (config.getSubMerchantId() != null && !config.getSubMerchantId().trim().isEmpty()) {
       fields.put("sub_merchant_id", config.getSubMerchantId().trim());
@@ -94,7 +115,7 @@ public class EasebuzzService {
     double cgst = 0;
     double sgst = 0;
 
-    if (appProperties.getTax().isEnabled()) {
+    if (order.isGstEnabled() && appProperties.getTax().isEnabled()) {
       // Use order's original tax ratio if available, or fall back to default
       double taxFactor = subtotal > 0 ? (discountedSubtotal / subtotal) : 1.0;
       cgst = order.getCgst() * taxFactor;
@@ -115,11 +136,12 @@ public class EasebuzzService {
     String txnid = data.getOrDefault("txnid", "");
     String email = data.getOrDefault("email", "");
     String productinfo = data.getOrDefault("productinfo", "");
+    String udf1 = data.getOrDefault("udf1", "");
     String postedHash = data.getOrDefault("hash", "");
 
-    // Reverse Hash:
-    // salt|status|||||||||||email|firstname|productinfo|amount|txnid|key
-    String hashSequence = salt + "|" + status + "|||||||||||" + email + "|" + firstname + "|"
+    // Reverse Hash Sequence:
+    // salt|status|udf10|udf9|udf8|udf7|udf6|udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key
+    String hashSequence = salt + "|" + status + "||||||||||" + udf1 + "|" + email + "|" + firstname + "|"
         + productinfo + "|" + amount + "|" + txnid + "|" + key;
 
     String calculatedHash = generateSHA512(hashSequence);

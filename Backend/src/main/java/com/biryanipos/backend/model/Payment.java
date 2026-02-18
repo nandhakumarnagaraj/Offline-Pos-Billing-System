@@ -42,6 +42,7 @@ public class Payment {
   private double totalAmount; // subtotal + cgst + sgst
 
   private double discount;
+  private boolean gstEnabled = false;
 
   private double amountReceived;
 

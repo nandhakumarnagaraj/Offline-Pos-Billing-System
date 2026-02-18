@@ -15,6 +15,7 @@ public class PaymentRequest {
   private double discount;
   private double amountReceived; // For cash — to compute change
   private String transactionRef; // UPI ref / card auth code
+  private Boolean gstEnabled; // NEW: support on-the-fly toggle
   private java.util.List<PaymentModeDetail> paymentModes;
 
   @Data

@@ -87,11 +87,13 @@ export const deleteCategory = (id) => api.delete(`/categories/${id}`);
 // Payments
 export const processPayment = (payment) => api.post('/payments', payment);
 export const getBill = (orderId) => api.get(`/payments/bill/${orderId}`);
-export const initiateDigitalPayment = (orderId, discount = 0, mode, upiId = null) => {
+export const initiateDigitalPayment = (orderId, discount = 0, mode, amount = null, metadata = null, upiId = null) => {
   const data = {
     orderId,
     discount,
     mode,
+    amount,
+    metadata
   };
   if (upiId) {
     data.upiId = upiId;
@@ -130,3 +132,8 @@ export const getDailyReport = () => api.get('/reports/daily');
 
 // System
 export const triggerBackup = () => api.post('/system/backup');
+
+// Configuration
+export const getConfig = () => api.get('/config');
+export const getCurrentConfig = () => api.get('/config/current');
+export const updateBatchConfigs = (configs) => api.post('/config/batch', configs);

@@ -14,7 +14,8 @@ public class AppConfig {
   @Id
   private String configKey;
 
-  @Column(length = 2000)
+  @Lob
+  @Column(columnDefinition = "LONGTEXT")
   private String configValue;
 
   private String description;

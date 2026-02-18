@@ -37,6 +37,7 @@ public class OrderService {
     order.setCustomerPhone(request.getCustomerPhone());
     order.setTableNumber(request.getTableNumber());
     order.setOrderType(request.getOrderType() != null ? request.getOrderType() : OrderType.DINE_IN);
+    order.setGstEnabled(request.isGstEnabled()); // NEW: Support toggle
     order.setStatus(OrderStatus.NEW);
     order.setPaymentStatus(PaymentStatus.PENDING);
     order.setCreatedBy(request.getCreatedBy());
@@ -102,11 +103,14 @@ public class OrderService {
     // Calculate GST based on items
     double totalCgst = 0;
     double totalSgst = 0;
-    for (OrderItem item : orderItems) {
-      double itemSubtotal = item.getPrice() * item.getQuantity();
-      double itemGstPercent = item.getMenuItem().getGstPercent();
-      totalCgst += (itemSubtotal * (itemGstPercent / 2.0)) / 100.0;
-      totalSgst += (itemSubtotal * (itemGstPercent / 2.0)) / 100.0;
+
+    if (order.isGstEnabled()) {
+      for (OrderItem item : orderItems) {
+        double itemSubtotal = item.getPrice() * item.getQuantity();
+        double itemGstPercent = item.getMenuItem().getGstPercent();
+        totalCgst += (itemSubtotal * (itemGstPercent / 2.0)) / 100.0;
+        totalSgst += (itemSubtotal * (itemGstPercent / 2.0)) / 100.0;
+      }
     }
 
     order.setCgst(totalCgst);
@@ -198,9 +202,12 @@ public class OrderService {
     for (OrderItem item : order.getItems()) {
       double itemSubtotal = item.getPrice() * item.getQuantity();
       newSubtotal += itemSubtotal;
-      double itemGstPercent = item.getMenuItem().getGstPercent();
-      totalCgst += (itemSubtotal * (itemGstPercent / 2.0)) / 100.0;
-      totalSgst += (itemSubtotal * (itemGstPercent / 2.0)) / 100.0;
+
+      if (order.isGstEnabled()) {
+        double itemGstPercent = item.getMenuItem().getGstPercent();
+        totalCgst += (itemSubtotal * (itemGstPercent / 2.0)) / 100.0;
+        totalSgst += (itemSubtotal * (itemGstPercent / 2.0)) / 100.0;
+      }
     }
 
     order.setSubtotal(newSubtotal);

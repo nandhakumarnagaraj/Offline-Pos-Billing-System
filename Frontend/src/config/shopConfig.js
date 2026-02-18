@@ -16,7 +16,7 @@ export const shopConfig = {
   fssai: "10425000000318",
   logo: logo,
   tagline: "Savory Delights for Every Occasion",
-  gstEnabled: true,
+  gstEnabled: false,
   gstPercentage: 5,
   footerMessage: "Thank you for visiting!",
   softwareBy: "Khana Book"

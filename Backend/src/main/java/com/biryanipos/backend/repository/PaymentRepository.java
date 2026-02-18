@@ -31,4 +31,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
   @Query("SELECT p.paymentMode, SUM(p.totalAmount) FROM Payment p WHERE p.paidAt BETWEEN :start AND :end AND p.paymentStatus = 'COMPLETED' GROUP BY p.paymentMode")
   List<Object[]> findPaymentModeBreakdownBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  @Query("SELECT COALESCE(SUM(p.totalAmount), 0) FROM Payment p WHERE p.paidAt BETWEEN :start AND :end AND p.paymentStatus = 'COMPLETED' AND p.gstEnabled = true")
+  Double sumTaxableRevenueBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  @Query("SELECT COALESCE(SUM(p.totalAmount), 0) FROM Payment p WHERE p.paidAt BETWEEN :start AND :end AND p.paymentStatus = 'COMPLETED' AND p.gstEnabled = false")
+  Double sumExemptRevenueBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

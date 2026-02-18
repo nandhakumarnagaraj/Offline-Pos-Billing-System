@@ -21,6 +21,7 @@ public class OrderRequest {
   private String tableNumber;
   private OrderType orderType = OrderType.DINE_IN;
   private String createdBy;
+  private boolean gstEnabled = false;
 
   @NotEmpty(message = "Order must have at least one item")
   private List<OrderItemRequest> items;

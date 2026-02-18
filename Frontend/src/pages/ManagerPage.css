@@ -1691,3 +1691,52 @@ input:checked+.slider:before {
     padding: 16px;
   }
 }
+/* Store Settings */
+.store-settings-panel {
+  padding: 30px;
+  max-width: 1000px;
+}
+
+.form-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.logo-upload-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-input);
+  padding: 15px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+}
+
+.logo-preview-sm {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  background: white;
+  padding: 5px;
+  border-radius: 4px;
+  box-shadow: var(--shadow-sm);
+}
+
+.file-input {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.store-footer-actions {
+  border-top: 1px solid var(--border);
+  margin-top: 30px;
+  padding-top: 20px;
+}
+
+.btn-lg {
+  padding: 16px 24px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-radius: var(--radius);
+}

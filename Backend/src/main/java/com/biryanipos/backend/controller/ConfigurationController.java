@@ -22,6 +22,10 @@ public class ConfigurationController {
 
   @GetMapping("/current")
   public AppProperties getCurrentProperties() {
+    // Return the bean directly; if proxy issues occur, Jackson usually handles
+    // them,
+    // but we'll ensure the service has refreshed it.
+    configurationService.refreshProperties();
     return appProperties;
   }
 
@@ -32,6 +36,6 @@ public class ConfigurationController {
 
   @PostMapping("/batch")
   public void updateConfigs(@RequestBody Map<String, String> configs) {
-    configs.forEach(configurationService::updateConfig);
+    configurationService.updateConfigs(configs);
   }
 }
