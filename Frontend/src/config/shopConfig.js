@@ -1,7 +1,8 @@
 import logo from '../assets/logo.png';
 
 export const shopConfig = {
-  name: "BIRYANIWALE ANNA",
+  name: "BiryaniWale Anna",
+  softwareName: "BiryaniWale Anna",
   address: [
     "B.N MARKET, JAGDEO PATH",
     "ANISABAD RD, KHAJPURA, PATNA",
@@ -18,5 +19,7 @@ export const shopConfig = {
   gstEnabled: true,
   gstPercentage: 5,
   footerMessage: "Thank you for visiting!",
-  softwareBy: "KhanaBook"
+  softwareBy: "Khana Book"
 };
+
+

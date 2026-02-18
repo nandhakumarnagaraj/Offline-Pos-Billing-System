@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../service/api';
 import { toast } from 'react-hot-toast';
+import { shopConfig } from '../config/shopConfig';
 import './LoginPage.css';
 
 function LoginPage() {
@@ -47,8 +48,10 @@ function LoginPage() {
     <div className="login-container">
       <div className="login-card animate-fadeIn">
         <div className="login-brand">
-          <div className="login-logo">🍛</div>
-          <h1>KhanaBook</h1>
+          <div className="login-logo">
+            <img src={shopConfig.logo} alt={shopConfig.name} style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
+          </div>
+          <h1>{shopConfig.softwareName}</h1>
           <p>Restaurant POS System</p>
         </div>
 

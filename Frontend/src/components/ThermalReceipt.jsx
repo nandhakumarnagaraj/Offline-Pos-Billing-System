@@ -147,36 +147,8 @@ const ThermalReceipt = ({ billData, calc }) => {
           </div>
           <div className="divider-double"></div>
 
-          <div className="amount-in-words">
-            <p>Total Amount in Words: {amountInWords}</p>
-          </div>
         </section>
 
-        {/* === TAX SECTION === */}
-        {shopConfig.gstEnabled && (
-          <section className="tax-summary">
-            <table className="tax-table">
-              <thead>
-                <tr>
-                  <th>GST%</th>
-                  <th>Taxable</th>
-                  <th>CGST</th>
-                  <th>SGST</th>
-                  <th>Tot.Tax</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>{shopConfig.gstPercentage}%</td>
-                  <td>{calc.sub?.toFixed(2)}</td>
-                  <td>{calc.cgst.toFixed(2)}</td>
-                  <td>{calc.sgst.toFixed(2)}</td>
-                  <td>{(calc.cgst + calc.sgst).toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </section>
-        )}
 
         {/* === FOOTER SECTION === */}
         <footer className="receipt-footer">

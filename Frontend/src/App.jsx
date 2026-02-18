@@ -6,6 +6,7 @@ import { getDashboard } from './service/api';
 import { Toaster } from 'react-hot-toast';
 import SyncManager from './components/SyncManager';
 import './App.css';
+import { shopConfig } from './config/shopConfig';
 
 // Lazy Load Pages for Performance
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -58,8 +59,10 @@ const Home = () => {
     <div className="home-container">
       <div className="home-content">
         <div className="brand-section">
-          <div className="brand-logo">🍛</div>
-          <h1 className="brand-title">KhanaBook</h1>
+          <div className="brand-logo">
+            <img src={shopConfig.logo} alt={shopConfig.name} style={{ width: '120px', height: '120px', objectFit: 'contain', marginBottom: '1rem' }} />
+          </div>
+          <h1 className="brand-title">{shopConfig.softwareName}</h1>
           <p className="brand-subtitle">Restaurant POS & Management System</p>
         </div>
 
@@ -68,7 +71,6 @@ const Home = () => {
             <Link to="/waiter" className="nav-card waiter-card">
               <div className="nav-icon">🍽️</div>
               <h2>Waiter</h2>
-
             </Link>
           )}
 
@@ -76,7 +78,6 @@ const Home = () => {
             <Link to="/kitchen" className="nav-card kitchen-card">
               <div className="nav-icon">👨‍🍳</div>
               <h2>Kitchen (KDS)</h2>
-
             </Link>
           )}
 
@@ -84,7 +85,6 @@ const Home = () => {
             <Link to="/counter" className="nav-card counter-card">
               <div className="nav-icon">💰</div>
               <h2>Cashier / Billing</h2>
-
             </Link>
           )}
 
@@ -92,13 +92,12 @@ const Home = () => {
             <Link to="/manager" className="nav-card manager-card">
               <div className="nav-icon">📊</div>
               <h2>Manager</h2>
-
             </Link>
           )}
         </div>
 
         <div className="home-footer">
-
+          <button className="btn btn-danger" onClick={logout}>Sign Out</button>
         </div>
       </div>
     </div>

@@ -17,16 +17,19 @@ import {
 } from '../service/api';
 import { connectWebSocket } from '../service/ws';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
 import LoadingOverlay from '../components/LoadingOverlay';
 import Modal from '../components/Modal';
 import { toast } from 'react-hot-toast';
 import './ManagerPage.css';
 
 // Local Modal component removed - using shared component
+const VARIATION_UNITS = ['Cms', 'Piece', 'scoop', 'grams', 'inches', 'ml', 'ounces', 'serves', 'slices', 'kg', 'Litre'];
 
 
 function ManagerPage() {
   const { logout, user } = useAuth();
+  const { config: shopConfig } = useConfig();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboard, setDashboard] = useState(null);
@@ -234,7 +237,7 @@ function ManagerPage() {
   const addVariation = () => {
     setNewItem({
       ...newItem,
-      variations: [...newItem.variations, { name: '', price: 0 }]
+      variations: [...newItem.variations, { name: '', unit: '', price: 0 }]
     });
   };
 
@@ -348,6 +351,7 @@ function ManagerPage() {
         price: parseFloat(newItem.price) || 0,
         variations: newItem.variations.map(v => ({
           ...v,
+          name: v.unit ? `${v.name} ${v.unit}`.trim() : v.name,
           price: parseFloat(v.price) || 0
         })),
         available: true,
@@ -516,8 +520,10 @@ function ManagerPage() {
     <div className="manager-page">
       <aside className="manager-sidebar">
         <div className="sidebar-brand">
-          <Link to="/" className="sidebar-logo">🍛</Link>
-          <span className="sidebar-title">KhanaBook</span>
+          <Link to="/" className="sidebar-logo">
+            <img src={shopConfig.logo} alt={shopConfig.name} style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+          </Link>
+          <span className="sidebar-title">{shopConfig.softwareName}</span>
         </div>
         <nav className="sidebar-nav">
           {[
@@ -668,9 +674,14 @@ function ManagerPage() {
                     <div className="variations-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {newItem.variations.map((v, idx) => (
                         <div key={idx} className="variation-row" style={{ display: 'flex', gap: '6px' }}>
-                          <input className="input" placeholder="Type" value={v.name} style={{ flex: 1.5 }}
+                          <input className="input" placeholder="Name/Qty" value={v.name} style={{ flex: 1.2 }}
                             onChange={e => updateVariation(idx, 'name', e.target.value)} />
-                          <input className="input" type="number" placeholder="₹" value={v.price} style={{ flex: 1 }}
+                          <select className="select" value={v.unit || ''} style={{ flex: 1 }}
+                            onChange={e => updateVariation(idx, 'unit', e.target.value)}>
+                            <option value="">Unit</option>
+                            {VARIATION_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                          <input className="input" type="number" placeholder="₹" value={v.price} style={{ flex: 0.8 }}
                             onChange={e => updateVariation(idx, 'price', e.target.value)} />
                           <button type="button" className="btn btn-danger btn-sm" onClick={() => removeVariation(idx)} style={{ padding: '0 8px' }}>×</button>
                         </div>

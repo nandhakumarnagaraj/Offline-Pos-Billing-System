@@ -466,7 +466,9 @@ function WaiterPage() {
                         {item.imageUrl ? (
                           <img src={item.imageUrl} alt={item.name} className="c-item-img" loading="lazy" />
                         ) : (
-                          <div className="image-placeholder">🍛</div>
+                          <div className="image-placeholder">
+                            <img src={shopConfig.logo} alt="Logo" style={{ width: '30px', opacity: 0.5 }} />
+                          </div>
                         )}
                         <div className="c-item-details">
                           <div className="c-item-title">{item.name}</div>

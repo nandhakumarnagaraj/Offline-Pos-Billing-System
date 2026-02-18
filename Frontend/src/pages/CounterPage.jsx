@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import ThermalReceipt from '../components/ThermalReceipt';
 import { addPendingSync } from '../db';
 import { useConfig } from '../context/ConfigContext';
+import LoadingOverlay from '../components/LoadingOverlay';
+import Modal from '../components/Modal';
 import { toast } from 'react-hot-toast';
 import './CounterPage.css';
 
@@ -44,6 +46,7 @@ function CounterPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [showVariationModal, setShowVariationModal] = useState(null); // { item }
 
   useEffect(() => {
     loadOrders();
@@ -135,6 +138,60 @@ function CounterPage() {
     } catch (err) {
       console.error("Reprint failed", err);
       toast.error("Failed to fetch bill data for reprint.");
+    }
+  };
+
+  const handleWhatsAppShareHistory = async (order) => {
+    setLoading(true);
+    try {
+      const res = await getBill(order.id);
+      const bData = res.data;
+      const disc = order.discount || 0;
+
+      const file = getBillPDFFile(bData, disc);
+      if (!file) return;
+
+      // 1. Prepare Data
+      let totalCgst = 0;
+      let totalSgst = 0;
+      bData.items?.forEach(item => {
+        const itemGst = item.gstPercent || shopConfig.gstPercentage;
+        const itemTax = (item.total * (itemGst / 100));
+        totalCgst += itemTax / 2;
+        totalSgst += itemTax / 2;
+      });
+      const total = (bData.subtotal - disc) + totalCgst + totalSgst;
+
+      const phone = bData.customerPhone || "";
+      const cleanPhone = phone.replace(/\D/g, '');
+      const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+      const message = `Here is your invoice for Order #${bData.orderId} from ${shopConfig.name}. Total: ₹${total.toFixed(2)}. \n\n(Note: Your Invoice PDF has been downloaded. Please attach it to this chat.)`;
+
+      const waUrl = `https://web.whatsapp.com/send/?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
+
+      // 2. Open WhatsApp Web FIRST
+      const waWindow = window.open(waUrl, '_blank');
+      if (!waWindow) {
+        toast.error("Popup blocked! Please allow popups for this site.");
+      }
+
+      // 3. Trigger Download
+      setTimeout(() => {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${shopConfig.name.replace(/\s+/g, '_')}_Bill_${bData.orderId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast.success("Invoice PDF Downloaded & WhatsApp Opening...");
+      }, 300);
+
+    } catch (err) {
+      console.error("WhatsApp share failed", err);
+      toast.error("Failed to share invoice via WhatsApp.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -294,6 +351,10 @@ function CounterPage() {
   };
 
   const addToCart = (item, variation = null) => {
+    if (item.variations && item.variations.length > 0 && !variation) {
+      setShowVariationModal(item);
+      return;
+    }
     const cartKey = variation ? `${item.id}-${variation.id}` : `${item.id}`;
     setCart(prev => ({
       ...prev,
@@ -303,6 +364,7 @@ function CounterPage() {
         qty: (prev[cartKey]?.qty || 0) + 1
       }
     }));
+    setShowVariationModal(null);
   };
 
   const removeFromCart = (cartKey) => {
@@ -326,59 +388,163 @@ function CounterPage() {
     window.print();
   };
 
-  const getBillPDFFile = () => {
-    if (!billData) return null;
-    const doc = new jsPDF({ format: [80, 150] }); // Thermal size
-    const primaryColor = [15, 23, 42]; // Slate 900
+  const numberToWords = (num) => {
+    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const convert = (n) => {
+      if (n < 20) return a[n];
+      if (n < 100) return b[Math.floor(n / 10)] + (n % 10 !== 0 ? '-' + a[n % 10] : '');
+      if (n < 1000) return a[Math.floor(n / 100)] + 'Hundred ' + (n % 100 !== 0 ? 'and ' + convert(n % 100) : '');
+      if (n < 100000) return convert(Math.floor(n / 1000)) + 'Thousand ' + (n % 1000 !== 0 ? convert(n % 1000) : '');
+      if (n < 10000000) return convert(Math.floor(n / 100000)) + 'Lakh ' + (n % 100000 !== 0 ? convert(n % 100000) : '');
+      return '';
+    };
+    const whole = Math.floor(num);
+    return convert(whole) + 'Rupees Only';
+  };
 
-    // Branding
-    doc.setFontSize(18);
-    doc.setTextColor(...primaryColor);
-    doc.text('KhanaBook', 40, 15, { align: 'center' });
-    doc.setFontSize(8);
-    doc.text('Delicious Food, Delivered Fast', 40, 20, { align: 'center' });
-    doc.setDrawColor(200);
-    doc.line(10, 25, 70, 25);
+  const getBillPDFFile = (customBillData = null, customDiscount = null) => {
+    const data = customBillData || billData;
+    const disc = customDiscount !== null ? customDiscount : (parseFloat(discount) || 0);
+    if (!data) return null;
 
-    // Meta
-    doc.setFontSize(7);
-    doc.text(`Invoice #: ${billData.orderId}`, 10, 32);
-    doc.text(`Table: ${billData.tableNumber}`, 10, 36);
-    doc.text(`Date: ${billData.createdAt}`, 10, 40);
-    if (billData.customerName) doc.text(`Customer: ${billData.customerName}`, 10, 44);
+    const doc = new jsPDF({ format: [80, 230], unit: 'mm' });
+    const pw = 80;
+    let y = 5;
 
-    // Items Table
-    autoTable(doc, {
-      startY: 48,
-      margin: { left: 5, right: 5 },
-      head: [['Item', 'Qty', 'Total']],
-      body: billData.items.map(i => [i.name, i.quantity, i.total.toFixed(2)]),
-      theme: 'plain',
-      styles: { fontSize: 7, cellPadding: 1 },
-      headStyles: { fontStyle: 'bold', borderBottom: [0.1, 0, 0, 0] }
+    // 1. Header Section
+    if (shopConfig.logo) {
+      try { doc.addImage(shopConfig.logo, 'PNG', pw / 2 - 12, y, 24, 24); y += 32; } catch (e) { y += 5; }
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text(shopConfig.name.toUpperCase(), pw / 2, y, { align: 'center' });
+    y += 5;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    shopConfig.address.forEach(line => {
+      doc.text(line.toUpperCase(), pw / 2, y, { align: 'center' });
+      y += 3.5;
+    });
+    if (shopConfig.fssai) {
+      doc.text(`FSSAI: ${shopConfig.fssai}`, pw / 2, y, { align: 'center' });
+      y += 5;
+    }
+
+    doc.setLineWidth(0.3);
+    doc.line(5, y, 75, y);
+    y += 5;
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(shopConfig.gstEnabled ? "TAX INVOICE" : "INVOICE", pw / 2, y, { align: 'center' });
+    y += 2;
+    doc.setLineWidth(0.1);
+    doc.setLineDashPattern([1, 1], 0);
+    doc.line(5, y + 2, 75, y + 2);
+    y += 6;
+
+    // 2. Meta Information
+    doc.setLineDashPattern([], 0);
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Bill No: ${data.orderId}`, 5, y);
+    doc.text(`Counter: 01`, 75, y, { align: 'right' });
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    const [datePart, timePart] = (data.createdAt || '').split(' ');
+    doc.text(`Date: ${datePart || ''}`, 5, y);
+    doc.text(`Time: ${timePart || ''}`, 75, y, { align: 'right' });
+    y += 4;
+    doc.line(5, y, 75, y);
+    y += 1;
+
+    // 3. Items Table
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.text("SL DESCRIPTION", 5, y + 3);
+    doc.text("QTY", 42, y + 3, { align: 'center' });
+    doc.text("PRICE", 58, y + 3, { align: 'right' });
+    doc.text("TOTAL", 75, y + 3, { align: 'right' });
+    y += 5;
+    doc.line(5, y, 75, y);
+    y += 4;
+    doc.setFont("helvetica", "normal");
+    data.items?.forEach((item, i) => {
+      doc.text(`${i + 1}`, 5, y);
+      const itemName = item.name.toUpperCase();
+      doc.text(itemName.length > 20 ? itemName.substring(0, 18) + '..' : itemName, 10, y);
+      doc.text(`${item.quantity}`, 42, y, { align: 'center' });
+      doc.text(`${item.unitPrice.toFixed(2)}`, 58, y, { align: 'right' });
+      doc.text(`${item.total.toFixed(2)}`, 75, y, { align: 'right' });
+      y += 5;
     });
 
-    // Totals
-    const finalY = doc.lastAutoTable.finalY + 5;
-    doc.line(10, finalY, 70, finalY);
-    doc.setFontSize(8);
-    doc.text(`Subtotal: INR ${billData.subtotal.toFixed(2)}`, 70, finalY + 8, { align: 'right' });
-    if (parseFloat(discount) > 0) {
-      doc.text(`Discount: -INR ${parseFloat(discount).toFixed(2)}`, 70, finalY + 12, { align: 'right' });
-    }
-    doc.text(`GST (${shopConfig.gstPercentage}%): INR ${(calc.cgst + calc.sgst).toFixed(2)}`, 70, finalY + 16, { align: 'right' });
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`TOTAL: INR ${calc.total.toFixed(2)}`, 70, finalY + 22, { align: 'right' });
+    // 4. Totals Summary
+    doc.setLineDashPattern([1, 1], 0);
+    doc.line(5, y, 75, y);
+    y += 4;
+    doc.text(`Sub-Total (${data.items?.length} Items)`, 5, y);
+    doc.text(`${data.subtotal.toFixed(2)}`, 75, y, { align: 'right' });
+    y += 4;
 
-    // Footer
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.text('Thank you for dining with us!', 40, finalY + 32, { align: 'center' });
-    doc.text('Visit again!', 40, finalY + 36, { align: 'center' });
+    let totalCgst = 0;
+    let totalSgst = 0;
+    data.items?.forEach(item => {
+      const itemGst = item.gstPercent || shopConfig.gstPercentage;
+      const itemTax = (item.total * (itemGst / 100));
+      totalCgst += itemTax / 2;
+      totalSgst += itemTax / 2;
+    });
+
+    if (shopConfig.gstEnabled) {
+      doc.text(`CGST (${shopConfig.gstPercentage / 2}%)`, 5, y);
+      doc.text(`${totalCgst.toFixed(2)}`, 75, y, { align: 'right' });
+      y += 4.5;
+      doc.text(`SGST (${shopConfig.gstPercentage / 2}%)`, 5, y);
+      doc.text(`${totalSgst.toFixed(2)}`, 75, y, { align: 'right' });
+      y += 4.5;
+    }
+
+    if (disc > 0) {
+      doc.text(`Discount`, 5, y);
+      doc.text(`- ${disc.toFixed(2)}`, 75, y, { align: 'right' });
+      y += 4;
+    }
+
+    const netAmount = (data.subtotal - disc) + totalCgst + totalSgst;
+    doc.setLineDashPattern([], 0);
+    doc.line(5, y, 75, y);
+    y += 7;
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("NET AMOUNT", 5, y);
+    doc.setFontSize(15);
+    // Use Rs. for safety in jspdf unless we use a custom font
+    doc.text(`Rs. ${netAmount.toFixed(2)}`, 75, y, { align: 'right' });
+    y += 4;
+    doc.line(5, y, 75, y);
+    y += 6;
+
+    // 5. Amount in Words - REMOVED AS REQUESTED
+    // 6. Final Footer
+    doc.setFillColor(0, 0, 0); doc.rect(5, y, 70, 7, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+    doc.text(disc > 0 ? `YOU SAVED Rs. ${disc.toFixed(2)} ON THIS BILL!` : "THANK YOU FOR SHOPPING WITH US", pw / 2, y + 4.5, { align: 'center' });
+    y += 12;
+    doc.setTextColor(0, 0, 0); doc.setFontSize(10);
+    doc.text(`WhatsApp: ${shopConfig.contact.whatsapp}`, pw / 2, y, { align: 'center' });
+    y += 4.5;
+    doc.setFontSize(8); doc.text(shopConfig.tagline || "", pw / 2, y, { align: 'center' });
+    y += 4; doc.setLineDashPattern([1, 1], 0); doc.line(5, y, 75, y); y += 10;
+    doc.setLineDashPattern([], 0); doc.setFontSize(14); doc.setFont("helvetica", "bold");
+    doc.text(shopConfig.footerMessage || "Thank you for visiting!", pw / 2, y, { align: 'center' });
+    y += 6; doc.setFontSize(7); doc.setFont("helvetica", "normal");
+    doc.text(`Software by ${shopConfig.softwareBy}`, pw / 2, y, { align: 'center' });
 
     const pdfBlob = doc.output('blob');
-    return new File([pdfBlob], `KhanaBook_Bill_${billData.orderId}.pdf`, { type: 'application/pdf' });
+    return new File([pdfBlob], `${shopConfig.name.replace(/\s+/g, '_')}_Bill_${data.orderId}.pdf`, { type: 'application/pdf' });
   };
 
   const autoShareWhatsAppBill = async () => {
@@ -391,7 +557,7 @@ function CounterPage() {
         await navigator.share({
           files: [file],
           title: `Invoice #${billData.orderId}`,
-          text: `Here is your bill from KhanaBook for ₹${calc.total.toFixed(2)}. Have a great day!`,
+          text: `Here is your bill from ${shopConfig.name} for ₹${calc.total.toFixed(2)}. Have a great day!`,
         });
       }
     } catch (err) {
@@ -520,7 +686,9 @@ function CounterPage() {
                         {item.imageUrl ? (
                           <img src={item.imageUrl} alt={item.name} className="c-item-img" loading="lazy" />
                         ) : (
-                          <div className="image-placeholder">🍛</div>
+                          <div className="image-placeholder">
+                            <img src={shopConfig.logo} alt="Logo" style={{ width: '30px', opacity: 0.5 }} />
+                          </div>
                         )}
                         <div className="c-item-details">
                           <div className="c-item-title">{item.name}</div>
@@ -777,12 +945,18 @@ function CounterPage() {
                       <td><span className={`badge badge-${order.status?.toLowerCase()}`}>{order.status}</span></td>
                       <td className="time-cell">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}</td>
                       <td>
-                        <div className="action-cell">
+                        <div className="action-cell" style={{ display: 'flex', gap: '4px' }}>
                           {order.status === 'PAID' && (
-                            <button className="btn btn-xs btn-primary" onClick={(e) => {
-                              e.stopPropagation();
-                              handleReprint(order);
-                            }}>Reprint</button>
+                            <>
+                              <button className="btn btn-xs btn-primary" onClick={(e) => {
+                                e.stopPropagation();
+                                handleReprint(order);
+                              }}>Reprint</button>
+                              <button className="btn btn-xs btn-success" style={{ backgroundColor: '#25D366', borderColor: '#25D366' }} onClick={(e) => {
+                                e.stopPropagation();
+                                handleWhatsAppShareHistory(order);
+                              }}>WhatsApp</button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -811,6 +985,28 @@ function CounterPage() {
         billData={billData}
         calc={{ ...calc, discount: parseFloat(discount) || 0 }}
       />
+
+      {/* Variation Selection Modal */}
+      <Modal
+        isOpen={!!showVariationModal}
+        onClose={() => setShowVariationModal(null)}
+        title={showVariationModal?.name || 'Select Variation'}
+      >
+        <div style={{ marginBottom: '16px', color: 'var(--text-secondary)' }}>Select your favorite variation</div>
+        <div className="variation-options-modern">
+          {showVariationModal?.variations?.map(v => (
+            <div key={v.id} className="variation-card-modern" onClick={() => addToCart(showVariationModal, v)}>
+              <div className="v-card-info">
+                <span className="v-name">{v.name}</span>
+                <span className="v-price">₹{v.price}</span>
+              </div>
+              <div className="v-add-icon">+</div>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      {loading && <LoadingOverlay message="Processing Order..." />}
     </div>
   );
 }

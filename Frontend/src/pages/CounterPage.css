@@ -1346,3 +1346,82 @@
     font-size: 0.8rem;
   }
 }
+
+/* Variation Modal Content Styles to match generic Modal */
+.variation-options-modern {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.variation-card-modern {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: var(--transition);
+}
+
+.variation-card-modern:hover {
+  border-color: var(--primary);
+  background: var(--bg-card-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.v-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.v-name {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.v-price {
+  color: var(--primary-light);
+  font-weight: 600;
+}
+
+.v-add-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-input);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  font-weight: 800;
+  border: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+.variation-card-modern:hover .v-add-icon {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+@media (max-width: 480px) {
+  .variation-options-modern {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .variation-card-modern {
+    padding: 12px;
+  }
+
+  .v-name {
+    font-size: 0.9rem;
+  }
+}
