@@ -325,7 +325,6 @@ function ManagerPage() {
         'shop.tagline': storeConfig.tagline,
         'shop.footerMessage': storeConfig.footerMessage,
         'shop.logoUrl': storeConfig.logoUrl,
-        'shop.softwareBy': storeConfig.softwareBy,
         'tax.enabled': String(storeConfig.taxEnabled),
         'tax.defaultGstPercent': String(storeConfig.defaultGstPercent)
       };
@@ -1543,12 +1542,6 @@ function ManagerPage() {
                     <input className="input" value={storeConfig.footerMessage}
                       onChange={e => setStoreConfig({ ...storeConfig, footerMessage: e.target.value })}
                       placeholder="e.g. Thank you for visiting!" />
-                  </div>
-                  <div className="form-group">
-                    <label>Software By</label>
-                    <input className="input" value={storeConfig.softwareBy}
-                      onChange={e => setStoreConfig({ ...storeConfig, softwareBy: e.target.value })}
-                      placeholder="Powered by..." />
                   </div>
                 </div>
 

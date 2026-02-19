@@ -89,7 +89,7 @@
 .receipt-logo {
   display: flex;
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
 }
 
 .logo-img {
@@ -102,7 +102,7 @@
 .store-name {
   font-size: 18px;
   font-weight: 800;
-  margin: 2px 0;
+  margin: 0;
   letter-spacing: -0.5px;
   text-transform: uppercase;
 }
@@ -247,7 +247,6 @@
   font-size: 9px;
   font-weight: 700;
   margin-bottom: 2px;
-  text-decoration: underline;
 }
 
 .payment-row {

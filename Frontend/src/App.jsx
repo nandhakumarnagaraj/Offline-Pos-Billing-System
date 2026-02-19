@@ -1,12 +1,11 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ConfigProvider } from './context/ConfigContext';
+import { ConfigProvider, useConfig } from './context/ConfigContext';
 import { getDashboard } from './service/api';
 import { Toaster } from 'react-hot-toast';
 import SyncManager from './components/SyncManager';
 import './App.css';
-import { shopConfig } from './config/shopConfig';
 
 // Lazy Load Pages for Performance
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -51,9 +50,36 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
+// Dynamic Browser Header Sync
+const DynamicHeader = () => {
+  const { config: shopConfig } = useConfig();
+
+  useEffect(() => {
+    if (shopConfig) {
+      // 1. Update Title
+      document.title = `${shopConfig.name} - POS`;
+
+      // 2. Update Meta Description
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) {
+        metaDesc.setAttribute("content", `${shopConfig.name} - ${shopConfig.tagline || 'Restaurant POS & Management System'}`);
+      }
+
+      // 3. Update Favicon
+      const favicon = document.querySelector('link[rel="icon"]');
+      if (favicon && shopConfig.logo) {
+        favicon.setAttribute("href", shopConfig.logo);
+      }
+    }
+  }, [shopConfig]);
+
+  return null;
+};
+
 // Home Component with Role-Based Navigation
 const Home = () => {
   const { user, logout } = useAuth();
+  const { config: shopConfig } = useConfig();
   const validRoles = ['ADMIN', 'MANAGER'];
   return (
     <div className="home-container">
@@ -62,8 +88,8 @@ const Home = () => {
           <div className="brand-logo">
             <img src={shopConfig.logo} alt={shopConfig.name} style={{ width: '120px', height: '120px', objectFit: 'contain', marginBottom: '1rem' }} />
           </div>
-          <h1 className="brand-title">{shopConfig.softwareName}</h1>
-          <p className="brand-subtitle">Restaurant POS & Management System</p>
+          <h1 className="brand-title">{shopConfig.name}</h1>
+          <p className="brand-subtitle">Restaurant POS System</p>
         </div>
 
         <div className="nav-grid">
@@ -107,6 +133,7 @@ const Home = () => {
 function App() {
   return (
     <ConfigProvider>
+      <DynamicHeader />
       <AuthProvider>
         <SyncManager />
         <Toaster

@@ -56,7 +56,7 @@ export default function PaymentSuccessPage() {
     return convert(whole) + 'Rupees Only';
   };
 
-  const getBillPDFFile = () => {
+  const getBillPDFFile = async () => {
     if (!billData) return null;
     const doc = new jsPDF({ format: [80, 230], unit: 'mm' });
     const pw = 80;
@@ -64,7 +64,29 @@ export default function PaymentSuccessPage() {
 
     // 1. Header Section
     if (shopConfig.logo) {
-      try { doc.addImage(shopConfig.logo, 'PNG', pw / 2 - 12, y, 24, 24); y += 32; } catch (e) { y += 5; }
+      try {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = shopConfig.logo;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+
+        // Use canvas to get a clean base64 PNG string
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL("image/png");
+
+        doc.addImage(dataUrl, 'PNG', pw / 2 - 12, y, 24, 24);
+        y += 30;
+      } catch (e) {
+        console.error("PDF Logo Error:", e);
+        y += 5;
+      }
     }
 
     doc.setFont("helvetica", "bold");
@@ -78,35 +100,77 @@ export default function PaymentSuccessPage() {
       doc.text(line.toUpperCase(), pw / 2, y, { align: 'center' });
       y += 3.5;
     });
+    if (shopConfig.gstEnabled && shopConfig.gstin) {
+      doc.text(`GSTIN: ${shopConfig.gstin.toUpperCase()}`, pw / 2, y, { align: 'center' });
+      y += 3.5;
+    }
     if (shopConfig.fssai) {
       doc.text(`FSSAI: ${shopConfig.fssai}`, pw / 2, y, { align: 'center' });
-      y += 5;
+      y += 3;
     }
 
     doc.setLineWidth(0.3);
     doc.line(5, y, 75, y);
-    y += 5;
+    y += 4.5;
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text(shopConfig.gstEnabled ? "TAX INVOICE" : "INVOICE", pw / 2, y, { align: 'center' });
-    y += 2;
+    y += 1.5;
     doc.setLineWidth(0.1);
     doc.setLineDashPattern([1, 1], 0);
-    doc.line(5, y + 2, 75, y + 2);
-    y += 6;
+    doc.line(5, y + 1.5, 75, y + 1.5);
+    y += 5;
 
     // 2. Meta Information
     doc.setLineDashPattern([], 0);
     doc.setFontSize(8.5);
+    
+    // Line 1: Bill No (Left) & Type (Right)
     doc.setFont("helvetica", "bold");
-    doc.text(`Bill No: ${billData.orderId}`, 5, y);
-    doc.text(`Counter: 01`, 75, y, { align: 'right' });
-    y += 5;
+    doc.text("Bill No: ", 5, y);
+    let labelWidth = doc.getTextWidth("Bill No: ");
     doc.setFont("helvetica", "normal");
+    doc.text(`${billData.orderId}`, 5 + labelWidth, y);
+    
+    doc.setFont("helvetica", "normal");
+    let typeValue = billData.orderType?.replace('_', ' ') || '';
+    doc.text(typeValue, 75, y, { align: 'right' });
+    doc.setFont("helvetica", "bold");
+    doc.text("Type: ", 75 - doc.getTextWidth(typeValue) - 1, y, { align: 'right' });
+    y += 4.5;
+
+    // Line 2: Date (Left) & Time (Right)
     const [datePart, timePart] = (billData.createdAt || '').split(' ');
-    doc.text(`Date: ${datePart || ''}`, 5, y);
-    doc.text(`Time: ${timePart || ''}`, 75, y, { align: 'right' });
-    y += 4;
+    doc.setFont("helvetica", "bold");
+    doc.text("Date: ", 5, y);
+    labelWidth = doc.getTextWidth("Date: ");
+    doc.setFont("helvetica", "normal");
+    doc.text(`${datePart || ''}`, 5 + labelWidth, y);
+
+    doc.setFont("helvetica", "normal");
+    let timeVal = timePart || '';
+    doc.text(timeVal, 75, y, { align: 'right' });
+    doc.setFont("helvetica", "bold");
+    doc.text("Time: ", 75 - doc.getTextWidth(timeVal) - 1, y, { align: 'right' });
+    y += 4.5;
+
+    if (billData.customerName || billData.customerPhone) {
+      if (billData.customerName) {
+        doc.setFont("helvetica", "bold");
+        doc.text("Cust: ", 5, y);
+        labelWidth = doc.getTextWidth("Cust: ");
+        doc.setFont("helvetica", "normal");
+        doc.text(`${billData.customerName}`, 5 + labelWidth, y);
+      }
+      if (billData.customerPhone) {
+        doc.setFont("helvetica", "normal");
+        let phoneVal = billData.customerPhone || '';
+        doc.text(phoneVal, 75, y, { align: 'right' });
+        doc.setFont("helvetica", "bold");
+        doc.text("Phone: ", 75 - doc.getTextWidth(phoneVal) - 1, y, { align: 'right' });
+      }
+      y += 4.5;
+    }
     doc.line(5, y, 75, y);
     y += 1;
 
@@ -122,13 +186,17 @@ export default function PaymentSuccessPage() {
     y += 4;
     doc.setFont("helvetica", "normal");
     billData.items?.forEach((item, i) => {
-      doc.text(`${i + 1}`, 5, y);
       const itemName = item.name.toUpperCase();
-      doc.text(itemName.length > 20 ? itemName.substring(0, 18) + '..' : itemName, 10, y);
+      const splitName = doc.splitTextToSize(itemName, 30);
+      
+      doc.text(`${i + 1}`, 5, y);
+      doc.text(splitName, 10, y);
       doc.text(`${item.quantity}`, 42, y, { align: 'center' });
       doc.text(`${item.unitPrice.toFixed(2)}`, 58, y, { align: 'right' });
       doc.text(`${item.total.toFixed(2)}`, 75, y, { align: 'right' });
-      y += 5;
+      
+      const itemHeight = (splitName.length * 3.5);
+      y += Math.max(5, itemHeight);
     });
 
     // 4. Totals Summary
@@ -149,7 +217,7 @@ export default function PaymentSuccessPage() {
     }
 
     if (billData.discount > 0) {
-      doc.text(`Discount`, 5, y);
+      doc.text(`Savings & Discount`, 5, y);
       doc.text(`- ${billData.discount.toFixed(2)}`, 75, y, { align: 'right' });
       y += 4;
     }
@@ -185,19 +253,15 @@ export default function PaymentSuccessPage() {
         y += 4;
       });
     } else {
-      doc.text(`MODE: ${pMode}`, 5, y);
+      doc.text(`Mode: ${pMode}`, 5, y);
       const amtRec = billData.amountReceived || netAmount;
       doc.text(`${amtRec.toFixed(2)}`, 75, y, { align: 'right' });
       y += 4;
     }
 
-    if (billData.changeReturned > 0) {
-      doc.setFont("helvetica", "bold");
-      doc.text("CHANGE RETURNED", 5, y);
-      doc.text(`${billData.changeReturned.toFixed(2)}`, 75, y, { align: 'right' });
-      y += 4;
-    }
-    y += 2;
+    doc.setLineDashPattern([1, 1], 0);
+    doc.line(5, y, 75, y);
+    y += 4;
 
     // 6. Final Footer
     doc.setFillColor(0, 0, 0); doc.rect(5, y, 70, 7, 'F');
@@ -213,7 +277,7 @@ export default function PaymentSuccessPage() {
     doc.setLineDashPattern([], 0); doc.setFontSize(14); doc.setFont("helvetica", "bold");
     doc.text(shopConfig.footerMessage || "Thank you for visiting!", pw / 2, y, { align: 'center' });
     y += 6; doc.setFontSize(7); doc.setFont("helvetica", "normal");
-    doc.text(`Software by ${shopConfig.softwareBy}`, pw / 2, y, { align: 'center' });
+    doc.text(`Software by Khana Book`, pw / 2, y, { align: 'center' });
 
     const pdfBlob = doc.output('blob');
     return new File([pdfBlob], `${shopConfig.name.replace(/\s+/g, '_')}_Bill_${billData.orderId}.pdf`, { type: 'application/pdf' });
@@ -232,7 +296,7 @@ export default function PaymentSuccessPage() {
     if (!billData) return;
     setLoading(true);
     try {
-      const file = getBillPDFFile();
+      const file = await getBillPDFFile();
       if (!file) return;
 
       // 1. Prepare Data

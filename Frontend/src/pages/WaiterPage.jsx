@@ -158,6 +158,10 @@ function WaiterPage() {
       toast.error('Please add items to the order.');
       return;
     }
+    if (!customerName || customerName.trim() === '') {
+      toast.error('Customer Name is required');
+      return;
+    }
     if (!customerPhone || customerPhone.trim().length < 10) {
       toast.error('Customer WhatsApp number is required');
       return;
@@ -540,8 +544,11 @@ function WaiterPage() {
                 </div>
 
                 <div className="customer-inputs-c">
-                  <input className="input" placeholder="Customer Name" value={customerName}
-                    onChange={e => setCustomerName(e.target.value)} />
+                  <div style={{ position: 'relative' }}>
+                    <input className="input" placeholder="Customer Name *" value={customerName}
+                      onChange={e => setCustomerName(e.target.value)} required />
+                    <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#EF4444', fontSize: '14px' }}>*</span>
+                  </div>
                   <div style={{ position: 'relative' }}>
                     <input className="input" placeholder="WhatsApp Number *" value={customerPhone}
                       onChange={e => setCustomerPhone(e.target.value)} required />

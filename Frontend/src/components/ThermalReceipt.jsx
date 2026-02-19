@@ -8,18 +8,22 @@ const ThermalReceipt = ({ billData, calc }) => {
 
   const today = new Date().toLocaleDateString('en-GB', {
     day: '2-digit',
-    month: 'short',
+    month: '2-digit',
     year: 'numeric',
-  }).replace(/ /g, '-');
+  }).split('/').join('-');
 
-  const time = new Date().toLocaleTimeString('en-IN', {
+  const time = new Date().toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
-    hour12: true,
+    hour12: false,
   });
 
   const savings = (parseFloat(calc.discount) || 0);
+
+  const maskString = (str) => {
+    if (!str) return '';
+    return str.split('').map((char, index) => index % 2 !== 0 ? '@' : char).join('');
+  };
 
   const numberToWords = (num) => {
     const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
@@ -53,7 +57,9 @@ const ThermalReceipt = ({ billData, calc }) => {
             {shopConfig.address.map((line, i) => (
               <p key={i} className="store-address">{line}</p>
             ))}
-            {/* <p className="store-gstin">GSTIN: {shopConfig.gstin}</p> */}
+            {shopConfig.gstEnabled && shopConfig.gstin && (
+              <p className="store-gstin">GSTIN: {shopConfig.gstin}</p>
+            )}
             <p className="store-fssai">FSSAI: {shopConfig.fssai}</p>
           </div>
           <div className="divider-double"></div>
@@ -69,8 +75,8 @@ const ThermalReceipt = ({ billData, calc }) => {
               <span className="value">{billData.orderId}</span>
             </div>
             <div className="info-item text-right">
-              <span className="label">Counter:</span>
-              <span className="value">01</span>
+              <span className="label">Type:</span>
+              <span className="value">{billData.orderType?.replace('_', ' ')}</span>
             </div>
             <div className="info-item">
               <span className="label">Date:</span>
@@ -80,6 +86,18 @@ const ThermalReceipt = ({ billData, calc }) => {
               <span className="label">Time:</span>
               <span className="value">{time}</span>
             </div>
+            {billData.customerName && (
+              <div className="info-item">
+                <span className="label">Cust:</span>
+                <span className="value">{maskString(billData.customerName)}</span>
+              </div>
+            )}
+            {billData.customerPhone && (
+              <div className="info-item text-right">
+                <span className="label">Phone:</span>
+                <span className="value">{maskString(billData.customerPhone)}</span>
+              </div>
+            )}
           </div>
         </section>
 
@@ -172,12 +190,6 @@ const ThermalReceipt = ({ billData, calc }) => {
               )
             )}
             
-            {(calc.change > 0 || billData.change > 0) && (
-              <div className="payment-row change-row">
-                <span>CHANGE RETURNED:</span>
-                <span>₹ {(calc.change || billData.change).toFixed(2)}</span>
-              </div>
-            )}
             <div className="divider-dashed"></div>
           </section>
         )}
@@ -202,7 +214,7 @@ const ThermalReceipt = ({ billData, calc }) => {
 
           <div className="footer-message">
             <p className="thanks">{shopConfig.footerMessage}</p>
-            <p className="copyright">Software by {shopConfig.softwareBy}</p>
+            <p className="copyright">Software by Khana Book</p>
           </div>
         </footer>
       </div>
