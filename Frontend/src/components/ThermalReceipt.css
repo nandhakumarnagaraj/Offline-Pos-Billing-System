@@ -238,6 +238,30 @@
   text-transform: capitalize;
 }
 
+/* --- Payment Details --- */
+.payment-details {
+  margin: 6px 0;
+}
+
+.payment-title {
+  font-size: 9px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  text-decoration: underline;
+}
+
+.payment-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  padding: 1px 0;
+}
+
+.change-row {
+  font-weight: 700;
+  margin-top: 2px;
+}
+
 /* --- Tax Table --- */
 .tax-summary {
   margin: 10px 0;

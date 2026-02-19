@@ -146,8 +146,41 @@ const ThermalReceipt = ({ billData, calc }) => {
             <span className="grand-total-val">₹ {calc.total.toFixed(2)}</span>
           </div>
           <div className="divider-double"></div>
-
         </section>
+
+        {/* === PAYMENT DETAILS SECTION === */}
+        {(calc.paymentMode || billData.paymentMode || (calc.paymentModes && calc.paymentModes.length > 0) || (billData.paymentModes && billData.paymentModes.length > 0)) && (
+          <section className="payment-details">
+            <div className="payment-title">PAYMENT DETAILS</div>
+            {/* Split Payment Mode */}
+            {((calc.paymentMode === 'SPLIT' || billData.paymentMode === 'SPLIT') || (calc.paymentModes?.length > 0 || billData.paymentModes?.length > 0)) ? (
+              <div className="split-payments">
+                {(calc.paymentModes || billData.paymentModes || []).map((p, i) => (
+                  <div key={i} className="payment-row">
+                    <span>{p.mode}</span>
+                    <span>₹ {p.amount.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* Single Payment Mode */
+              (calc.paymentMode || billData.paymentMode) && (
+                <div className="payment-row">
+                  <span>Mode: {calc.paymentMode || billData.paymentMode}</span>
+                  <span>₹ {(calc.amountReceived || billData.amountReceived || calc.total).toFixed(2)}</span>
+                </div>
+              )
+            )}
+            
+            {(calc.change > 0 || billData.change > 0) && (
+              <div className="payment-row change-row">
+                <span>CHANGE RETURNED:</span>
+                <span>₹ {(calc.change || billData.change).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="divider-dashed"></div>
+          </section>
+        )}
 
 
         {/* === FOOTER SECTION === */}

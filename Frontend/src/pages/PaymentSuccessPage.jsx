@@ -166,9 +166,39 @@ export default function PaymentSuccessPage() {
     doc.text(`Rs. ${netAmount.toFixed(2)}`, 75, y, { align: 'right' });
     y += 4;
     doc.line(5, y, 75, y);
-    y += 6;
+    y += 5;
 
-    // 5. Amount in Words - REMOVED AS REQUESTED
+    // Payment Details in PDF
+    const pMode = billData.paymentMode || 'ONLINE';
+    const pModes = billData.paymentModes || [];
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("PAYMENT DETAILS", 5, y);
+    y += 4;
+    doc.setFont("helvetica", "normal");
+    
+    if (pModes.length > 0) {
+      pModes.forEach(p => {
+        doc.text(`${p.mode}`, 5, y);
+        doc.text(`${p.amount.toFixed(2)}`, 75, y, { align: 'right' });
+        y += 4;
+      });
+    } else {
+      doc.text(`MODE: ${pMode}`, 5, y);
+      const amtRec = billData.amountReceived || netAmount;
+      doc.text(`${amtRec.toFixed(2)}`, 75, y, { align: 'right' });
+      y += 4;
+    }
+
+    if (billData.changeReturned > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.text("CHANGE RETURNED", 5, y);
+      doc.text(`${billData.changeReturned.toFixed(2)}`, 75, y, { align: 'right' });
+      y += 4;
+    }
+    y += 2;
+
     // 6. Final Footer
     doc.setFillColor(0, 0, 0); doc.rect(5, y, 70, 7, 'F');
     doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
@@ -252,7 +282,9 @@ export default function PaymentSuccessPage() {
     total: shopConfig.gstEnabled ? billData.totalAmount : (billData.subtotal - (billData.discount || 0)),
     discount: billData.discount || 0,
     change: billData.changeReturned || 0,
-    amountReceived: billData.amountReceived || 0
+    amountReceived: billData.amountReceived || 0,
+    paymentMode: billData.paymentMode || 'ONLINE',
+    paymentModes: billData.paymentModes || []
   } : {};
 
   return (

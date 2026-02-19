@@ -572,9 +572,40 @@ function CounterPage() {
     doc.text(`Rs. ${netAmount.toFixed(2)}`, 75, y, { align: 'right' });
     y += 4;
     doc.line(5, y, 75, y);
-    y += 6;
+    y += 5;
 
-    // 5. Amount in Words - REMOVED AS REQUESTED
+    // Payment Details in PDF
+    const pMode = data.paymentMode || paymentMode;
+    const pModes = data.paymentModes || (pMode === 'SPLIT' ? addedPayments : []);
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("PAYMENT DETAILS", 5, y);
+    y += 4;
+    doc.setFont("helvetica", "normal");
+    
+    if (pMode === 'SPLIT' || pModes.length > 0) {
+      pModes.forEach(p => {
+        doc.text(`${p.mode}`, 5, y);
+        doc.text(`${p.amount.toFixed(2)}`, 75, y, { align: 'right' });
+        y += 4;
+      });
+    } else {
+      doc.text(`MODE: ${pMode}`, 5, y);
+      const amtRec = data.amountReceived || parseFloat(amountReceived) || netAmount;
+      doc.text(`${amtRec.toFixed(2)}`, 75, y, { align: 'right' });
+      y += 4;
+    }
+
+    const changeAmt = data.change || calc.change || 0;
+    if (changeAmt > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.text("CHANGE RETURNED", 5, y);
+      doc.text(`${changeAmt.toFixed(2)}`, 75, y, { align: 'right' });
+      y += 4;
+    }
+    y += 2;
+
     // 6. Final Footer
     doc.setFillColor(0, 0, 0); doc.rect(5, y, 70, 7, 'F');
     doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
@@ -638,7 +669,12 @@ function CounterPage() {
     const totalPaidSoFar = addedPayments.reduce((sum, p) => sum + p.amount, 0);
     const multiPayRemaining = Math.max(0, total - totalPaidSoFar);
 
-    return { sub, cgst, sgst, total, change, multiPayRemaining, totalPaidSoFar };
+    return { 
+      sub, cgst, sgst, total, change, multiPayRemaining, totalPaidSoFar,
+      paymentMode,
+      paymentModes: addedPayments,
+      amountReceived: parseFloat(amountReceived) || 0
+    };
   };
 
   const calc = calculateBill();
