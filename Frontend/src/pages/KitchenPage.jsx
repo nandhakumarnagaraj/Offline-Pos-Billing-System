@@ -164,7 +164,7 @@ function KitchenPage() {
               <div key={order.id} className="kds-card card-new animate-slideUp">
                 <div className="kds-card-top">
                   <div className="kds-order-id">{order.id}</div>
-                  <div className="kds-table">{order.tableNumber}</div>
+                  <div className="kds-table">{order.tableNumber === 'TAKEAWAY' ? '🥡 Takeaway' : (order.tableNumber || '🥡 Takeaway')}</div>
                   <KDSTimer order={order} />
                 </div>
                 <div className="kds-items">
@@ -203,7 +203,7 @@ function KitchenPage() {
               <div key={order.id} className="kds-card card-cooking">
                 <div className="kds-card-top">
                   <div className="kds-order-id">{order.id}</div>
-                  <div className="kds-table">{order.tableNumber}</div>
+                  <div className="kds-table">{order.tableNumber === 'TAKEAWAY' ? '🥡 Takeaway' : (order.tableNumber || '🥡 Takeaway')}</div>
                   <KDSTimer order={order} />
                 </div>
                 <div className="kds-items">
@@ -239,7 +239,7 @@ function KitchenPage() {
               <div key={order.id} className="kds-card card-ready">
                 <div className="kds-card-top">
                   <div className="kds-order-id">{order.id}</div>
-                  <div className="kds-table">{order.tableNumber}</div>
+                  <div className="kds-table">{order.tableNumber === 'TAKEAWAY' ? '🥡 Takeaway' : (order.tableNumber || '🥡 Takeaway')}</div>
                   <KDSTimer order={order} />
                 </div>
                 <div className="kds-items">

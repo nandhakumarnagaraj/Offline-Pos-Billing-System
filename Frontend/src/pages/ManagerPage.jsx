@@ -325,13 +325,14 @@ function ManagerPage() {
         'shop.tagline': storeConfig.tagline,
         'shop.footerMessage': storeConfig.footerMessage,
         'shop.logoUrl': storeConfig.logoUrl,
+        'shop.softwareBy': storeConfig.softwareBy,
         'tax.enabled': String(storeConfig.taxEnabled),
         'tax.defaultGstPercent': String(storeConfig.defaultGstPercent)
       };
 
       console.log("Saving store config...", payload);
       await updateBatchConfigs(payload);
-      await refreshConfig();
+      // Removed manual refreshConfig() call as WebSocket will handle it
       toast.success('Store configuration updated successfully!');
     } catch (err) {
       console.error("Config update error:", err);
@@ -1512,91 +1513,166 @@ function ManagerPage() {
         {/* STORE SETTINGS */}
         {activeTab === 'store' && (
           <div className="m-section animate-fadeIn">
-            <h2>Store Configuration</h2>
-            <div className="glass-card store-settings-panel">
-              <div className="form-grid">
-                <div className="form-column">
-                  <div className="form-group">
+            <div className="store-config-header">
+              <h2>Store Configuration</h2>
+              <button className="btn-save-all" onClick={handleSaveStoreConfig}>
+                💾 Save All Changes
+              </button>
+            </div>
+
+            <div className="store-settings-container">
+              <div className="store-settings-grid">
+                {/* COLUMN 1: SHOP IDENTITY */}
+                <div className="settings-card">
+                  <div className="card-header">
+                    <span>🏷️</span>
+                    <h3>Shop Identity</h3>
+                  </div>
+
+                  <div className="settings-form-group">
                     <label>Shop Name</label>
-                    <input className="input" value={storeConfig.name}
+                    <input
+                      className="settings-input"
+                      value={storeConfig.name}
                       onChange={e => setStoreConfig({ ...storeConfig, name: e.target.value })}
-                      placeholder="e.g. Biryani POS" />
+                      placeholder="e.g. Biryani Wale"
+                    />
                   </div>
-                  <div className="form-group">
-                    <label>Logo</label>
-                    <div className="logo-upload-container">
-                      {storeConfig.logoUrl && (
-                        <img src={storeConfig.logoUrl} alt="Preview" className="logo-preview-sm" style={{ width: '100px', height: '100px', objectFit: 'contain', marginBottom: '10px' }} />
-                      )}
-                      <input type="file" accept="image/*" onChange={handleLogoUpload} className="file-input" />
-                    </div>
-                  </div>
-                  <div className="form-group">
+
+                  <div className="settings-form-group">
                     <label>Tagline</label>
-                    <input className="input" value={storeConfig.tagline}
+                    <input
+                      className="settings-input"
+                      value={storeConfig.tagline}
                       onChange={e => setStoreConfig({ ...storeConfig, tagline: e.target.value })}
-                      placeholder="Your shop's slogan" />
-                  </div>
-                  <div className="form-group">
-                    <label>Footer Message</label>
-                    <input className="input" value={storeConfig.footerMessage}
-                      onChange={e => setStoreConfig({ ...storeConfig, footerMessage: e.target.value })}
-                      placeholder="e.g. Thank you for visiting!" />
-                  </div>
-                </div>
-
-                <div className="form-column">
-                  <div className="form-group">
-                    <label>Address (One line per row)</label>
-                    <textarea className="input" rows="3" value={storeConfig.address}
-                      onChange={e => setStoreConfig({ ...storeConfig, address: e.target.value })}
-                      placeholder="123 Main St&#10;City, State&#10;Pin Code" />
-                  </div>
-                  <div className="form-group">
-                    <label>Phone Number</label>
-                    <input className="input" value={storeConfig.phone}
-                      onChange={e => setStoreConfig({ ...storeConfig, phone: e.target.value })} />
-                  </div>
-                  <div className="form-group">
-                    <label>WhatsApp Number</label>
-                    <input className="input" value={storeConfig.whatsapp}
-                      onChange={e => setStoreConfig({ ...storeConfig, whatsapp: e.target.value })} />
-                  </div>
-                  <div className="form-group">
-                    <label>GSTIN</label>
-                    <input className="input" value={storeConfig.gstin}
-                      onChange={e => setStoreConfig({ ...storeConfig, gstin: e.target.value })} />
-                  </div>
-                  <div className="form-group">
-                    <label>FSSAI No</label>
-                    <input className="input" value={storeConfig.fssai}
-                      onChange={e => setStoreConfig({ ...storeConfig, fssai: e.target.value })} />
+                      placeholder="Savory Delights for Every Occasion"
+                    />
                   </div>
 
-                  <div className="form-group" style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '8px' }}>
-                    <h4 style={{ marginBottom: '10px' }}>Tax Settings</h4>
-                    <label className="checkbox-label" style={{ marginBottom: '10px' }}>
-                      <input type="checkbox" checked={storeConfig.taxEnabled}
-                        onChange={e => setStoreConfig({ ...storeConfig, taxEnabled: e.target.checked })} />
-                      Enable GST on Bills
-                    </label>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label>Default GST Percentage (%)</label>
-                      <input className="input" type="number" step="0.5" value={storeConfig.defaultGstPercent}
-                        onChange={e => setStoreConfig({ ...storeConfig, defaultGstPercent: e.target.value })} />
+                  <div className="settings-form-group">
+                    <label>Shop Logo</label>
+                    <div className="logo-box">
+                      {storeConfig.logoUrl && (
+                        <div className="logo-preview-wrapper">
+                          <img src={storeConfig.logoUrl} alt="Logo" className="logo-preview-img" />
+                          <button
+                            className="btn-remove-logo"
+                            onClick={() => setStoreConfig({ ...storeConfig, logoUrl: '' })}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                      <label className="btn-change-logo">
+                        {storeConfig.logoUrl ? 'Change Logo' : 'Upload Logo'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="store-footer-actions">
-                <button className="btn btn-primary btn-lg" onClick={handleSaveStoreConfig} style={{ width: '100%', marginTop: '20px' }}>
-                  💾 Save Configuration
-                </button>
+
+                {/* COLUMN 2: CONTACT & ADDRESS */}
+                <div className="settings-card">
+                  <div className="card-header">
+                    <span>📍</span>
+                    <h3>Contact & Address</h3>
+                  </div>
+
+                  <div className="settings-form-group">
+                    <label>Address</label>
+                    <textarea
+                      className="settings-input"
+                      rows="4"
+                      value={storeConfig.address}
+                      onChange={e => setStoreConfig({ ...storeConfig, address: e.target.value })}
+                      placeholder="5B, Oil Mil Streets, Kulam Park,&#10;West Tambaram, Chennai - 45"
+                      style={{ resize: 'none' }}
+                    />
+                  </div>
+
+                  <div className="settings-form-group">
+                    <label>WhatsApp Number</label>
+                    <input
+                      className="settings-input"
+                      value={storeConfig.whatsapp}
+                      onChange={e => setStoreConfig({ ...storeConfig, whatsapp: e.target.value })}
+                      placeholder="9874563215"
+                    />
+                  </div>
+
+                  <div className="settings-form-group">
+                    <label>Footer Message</label>
+                    <input
+                      className="settings-input"
+                      value={storeConfig.footerMessage}
+                      onChange={e => setStoreConfig({ ...storeConfig, footerMessage: e.target.value })}
+                      placeholder="Thank You for Visiting!"
+                    />
+                  </div>
+                </div>
+
+                {/* COLUMN 3: TAX & COMPLIANCE */}
+                <div className="settings-card">
+                  <div className="card-header">
+                    <span>⚖️</span>
+                    <h3>Tax & Compliance</h3>
+                  </div>
+
+                  <div className="tax-toggle-box">
+                    <span>Enable GST on Billing</span>
+                    <input
+                      type="checkbox"
+                      className="custom-checkbox"
+                      checked={storeConfig.taxEnabled}
+                      onChange={e => setStoreConfig({ ...storeConfig, taxEnabled: e.target.checked })}
+                    />
+                  </div>
+
+                  {storeConfig.taxEnabled && (
+                    <>
+                      <div className="settings-form-group">
+                        <label>GSTIN</label>
+                        <input
+                          className="settings-input"
+                          value={storeConfig.gstin}
+                          onChange={e => setStoreConfig({ ...storeConfig, gstin: e.target.value })}
+                          placeholder="9517534862852"
+                        />
+                      </div>
+
+                      <div className="settings-form-group">
+                        <label>GST Percentage</label>
+                        <input
+                          className="settings-input"
+                          type="number"
+                          step="0.5"
+                          value={storeConfig.defaultGstPercent}
+                          onChange={e => setStoreConfig({ ...storeConfig, defaultGstPercent: e.target.value })}
+                          placeholder="5"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="settings-form-group">
+                    <label>FSSAI License No</label>
+                    <input
+                      className="settings-input"
+                      value={storeConfig.fssai}
+                      onChange={e => setStoreConfig({ ...storeConfig, fssai: e.target.value })}
+                      placeholder="987456lkjg4"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        )
-        }
+        )}
 
         {/* RECIPES */}
         {

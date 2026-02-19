@@ -56,6 +56,7 @@ function CounterPage() {
       (order) => {
         setOrders(prev => {
           const idx = prev.findIndex(o => o.id === order.id);
+          // If PAID or CANCELLED, always remove from active orders
           if (order.status === 'PAID' || order.status === 'CANCELLED') {
             return prev.filter(o => o.id !== order.id);
           }
@@ -67,14 +68,12 @@ function CounterPage() {
           return [...prev, order];
         });
 
-        // Update history state for PAID orders
-        if (order.status === 'PAID') {
-          setAllOrders(prev => {
-            const exists = prev.find(o => o.id === order.id);
-            if (exists) return prev.map(o => o.id === order.id ? order : o);
-            return [order, ...prev];
-          });
-        }
+        // Update history state for all order changes
+        setAllOrders(prev => {
+          const exists = prev.find(o => o.id === order.id);
+          if (exists) return prev.map(o => o.id === order.id ? order : o);
+          return [order, ...prev].sort((a, b) => b.id - a.id);
+        });
       },
       null, // No table updates for counter
       (alert) => {
@@ -103,8 +102,8 @@ function CounterPage() {
         getOrdersByDate(today, today)
       ]);
       setOrders(activeRes.data);
-      // Sort history to show newest first
-      setAllOrders(allRes.data.filter(o => o.status === 'PAID').sort((a, b) => b.id - a.id));
+      // Sort history to show newest first, including all statuses
+      setAllOrders(allRes.data.sort((a, b) => b.id - a.id));
     } catch (err) { console.error(err); }
   };
 
@@ -304,7 +303,7 @@ function CounterPage() {
 
       toast.success('Payment processed!');
 
-      // Automatically trigger WhatsApp PDF Share
+      // Automatically trigger WhatsApp Web Share
       await autoShareWhatsAppBill();
 
       setSelectedOrder(null);
@@ -688,7 +687,7 @@ function CounterPage() {
     doc.setLineDashPattern([], 0); doc.setFontSize(14); doc.setFont("helvetica", "bold");
     doc.text(shopConfig.footerMessage || "Thank you for visiting!", pw / 2, y, { align: 'center' });
     y += 6; doc.setFontSize(7); doc.setFont("helvetica", "normal");
-    doc.text(`Software by Khana Book`, pw / 2, y, { align: 'center' });
+    doc.text(`Powered by ${shopConfig.softwareBy || 'Khana Book'}`, pw / 2, y, { align: 'center' });
 
     const pdfBlob = doc.output('blob');
     return new File([pdfBlob], `${shopConfig.name.replace(/\s+/g, '_')}_Bill_${data.orderId}.pdf`, { type: 'application/pdf' });
@@ -700,13 +699,29 @@ function CounterPage() {
       const file = await getBillPDFFile();
       if (!file) return;
 
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: `Invoice #${billData.orderId}`,
-          text: `Here is your bill from ${shopConfig.name} for ₹${calc.total.toFixed(2)}. Have a great day!`,
-        });
-      }
+      const phone = billData.customerPhone || "";
+      const cleanPhone = phone.replace(/\D/g, '');
+      const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+      
+      const message = `Here is your invoice for Order #${billData.orderId} from ${shopConfig.name}. Total: ₹${calc.total.toFixed(2)}. \n\n(Note: Your Invoice PDF has been downloaded. Please attach it to this chat.)`;
+
+      const waUrl = `https://web.whatsapp.com/send/?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
+
+      // Open WhatsApp Web
+      const waWindow = window.open(waUrl, '_blank');
+      
+      // Trigger PDF Download
+      setTimeout(() => {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${shopConfig.name.replace(/\s+/g, '_')}_Bill_${billData.orderId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast.success("Opening WhatsApp & Downloading Bill...");
+      }, 300);
+
     } catch (err) {
       console.error("Auto-share failed", err);
     }
@@ -747,7 +762,7 @@ function CounterPage() {
   };
 
   const calc = calculateBill();
-  const activeOrdersList = orders.filter(o => o.status !== 'PAID' && o.status !== 'CANCELLED');
+  const activeOrdersList = orders.filter(o => o.status !== 'PAID' && o.status !== 'CANCELLED' && o.orderType !== 'TAKEAWAY');
 
   return (
     <div className="counter-page">

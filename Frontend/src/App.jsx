@@ -50,32 +50,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
-// Dynamic Browser Header Sync
-const DynamicHeader = () => {
-  const { config: shopConfig } = useConfig();
-
-  useEffect(() => {
-    if (shopConfig) {
-      // 1. Update Title
-      document.title = `${shopConfig.name} - POS`;
-
-      // 2. Update Meta Description
-      const metaDesc = document.querySelector('meta[name="description"]');
-      if (metaDesc) {
-        metaDesc.setAttribute("content", `${shopConfig.name} - ${shopConfig.tagline || 'Restaurant POS & Management System'}`);
-      }
-
-      // 3. Update Favicon
-      const favicon = document.querySelector('link[rel="icon"]');
-      if (favicon && shopConfig.logo) {
-        favicon.setAttribute("href", shopConfig.logo);
-      }
-    }
-  }, [shopConfig]);
-
-  return null;
-};
-
 // Home Component with Role-Based Navigation
 const Home = () => {
   const { user, logout } = useAuth();
@@ -133,7 +107,6 @@ const Home = () => {
 function App() {
   return (
     <ConfigProvider>
-      <DynamicHeader />
       <AuthProvider>
         <SyncManager />
         <Toaster

@@ -6,6 +6,7 @@ import com.biryanipos.backend.repository.AppConfigRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +21,7 @@ public class ConfigurationService {
 
   private final AppConfigRepository configRepository;
   private final AppProperties appProperties;
+  private final SimpMessagingTemplate messagingTemplate;
 
   @PostConstruct
   public void init() {
@@ -100,12 +102,14 @@ public class ConfigurationService {
   public void updateConfig(String key, String value) {
     saveConfig(key, value);
     refreshProperties();
+    messagingTemplate.convertAndSend("/topic/config", getAllConfigs());
   }
 
   @Transactional
   public void updateConfigs(Map<String, String> configs) {
     configs.forEach(this::saveConfig);
     refreshProperties();
+    messagingTemplate.convertAndSend("/topic/config", getAllConfigs());
   }
 
   private void saveConfig(String key, String value) {

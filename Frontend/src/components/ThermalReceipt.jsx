@@ -214,7 +214,7 @@ const ThermalReceipt = ({ billData, calc }) => {
 
           <div className="footer-message">
             <p className="thanks">{shopConfig.footerMessage}</p>
-            <p className="copyright">Software by Khana Book</p>
+            <p className="copyright">Powered by {shopConfig.softwareBy || 'Khana Book'}</p>
           </div>
         </footer>
       </div>

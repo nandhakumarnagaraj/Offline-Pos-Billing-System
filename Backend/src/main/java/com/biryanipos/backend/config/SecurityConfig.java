@@ -36,7 +36,7 @@ public class SecurityConfig {
             // Public endpoints — login, WebSocket, Config, Payment Callbacks
             .requestMatchers("/api/auth/login").permitAll()
             .requestMatchers("/ws/**").permitAll()
-            .requestMatchers("/api/config/**").permitAll()
+            .requestMatchers("/api/config", "/api/config/**").permitAll()
             .requestMatchers("/api/payments/easebuzz/**").permitAll()
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 

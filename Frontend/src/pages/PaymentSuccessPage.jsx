@@ -277,7 +277,7 @@ export default function PaymentSuccessPage() {
     doc.setLineDashPattern([], 0); doc.setFontSize(14); doc.setFont("helvetica", "bold");
     doc.text(shopConfig.footerMessage || "Thank you for visiting!", pw / 2, y, { align: 'center' });
     y += 6; doc.setFontSize(7); doc.setFont("helvetica", "normal");
-    doc.text(`Software by Khana Book`, pw / 2, y, { align: 'center' });
+    doc.text(`Powered by ${shopConfig.softwareBy || 'Khana Book'}`, pw / 2, y, { align: 'center' });
 
     const pdfBlob = doc.output('blob');
     return new File([pdfBlob], `${shopConfig.name.replace(/\s+/g, '_')}_Bill_${billData.orderId}.pdf`, { type: 'application/pdf' });

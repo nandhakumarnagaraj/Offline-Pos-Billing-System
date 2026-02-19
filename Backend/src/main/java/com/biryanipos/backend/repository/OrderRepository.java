@@ -33,7 +33,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
   @Query("SELECT COUNT(o) FROM Order o WHERE o.createdAt BETWEEN :start AND :end")
   long countByCreatedAtBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-  @Query("SELECT o FROM Order o WHERE o.status IN ('NEW', 'COOKING') ORDER BY o.createdAt ASC")
+  @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.items WHERE o.status IN ('NEW', 'COOKING') ORDER BY o.createdAt ASC")
   List<Order> findKitchenOrders();
 
   @Query("SELECT COUNT(o) FROM Order o WHERE o.status = :status AND o.createdAt BETWEEN :start AND :end")

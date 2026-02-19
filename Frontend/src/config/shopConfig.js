@@ -1,21 +1,20 @@
 import logo from '../assets/logo.png';
 
 export const shopConfig = {
-  name: "BiryaniWale Anna",
-  softwareName: "BiryaniWale Anna",
+  name: "Restaurant POS",
+  softwareName: "Khana Book POS",
   address: [
-    "B.N MARKET, JAGDEO PATH",
-    "ANISABAD RD, KHAJPURA, PATNA",
-    "BIHAR - 800014 (Patna Sadar)"
+    "Address Line 1",
+    "Address Line 2"
   ],
   contact: {
-    phone: "9150677849",
-    whatsapp: "9150677849"
+    phone: "",
+    whatsapp: ""
   },
   gstin: "",
-  fssai: "10425000000318",
+  fssai: "",
   logo: logo,
-  tagline: "Savory Delights for Every Occasion",
+  tagline: "Quality Food & Service",
   gstEnabled: false,
   gstPercentage: 5,
   footerMessage: "Thank you for visiting!",
