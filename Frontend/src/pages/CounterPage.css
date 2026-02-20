@@ -175,6 +175,31 @@
   box-shadow: var(--shadow-lg), 0 0 20px rgba(255, 107, 53, 0.1);
 }
 
+/* High Visibility for Served Orders (Ready for Bill) */
+.counter-order-card.status-served {
+  border: 2px solid var(--info);
+  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(59, 130, 246, 0.05) 100%);
+  animation: pulse-served 3s infinite;
+}
+
+@keyframes pulse-served {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.counter-order-card.status-ready {
+  border-color: var(--success-border);
+}
+
 .co-top {
   display: flex;
   justify-content: space-between;
@@ -1425,6 +1450,7 @@
     font-size: 0.9rem;
   }
 }
+
 /* Toggle Switch */
 .toggle-switch {
   position: relative;
@@ -1464,10 +1490,10 @@
   border-radius: 50%;
 }
 
-input:checked + .slider {
+input:checked+.slider {
   background-color: var(--primary);
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(20px);
 }

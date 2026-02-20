@@ -1525,8 +1525,8 @@ function ManagerPage() {
                 {/* COLUMN 1: SHOP IDENTITY */}
                 <div className="settings-card">
                   <div className="card-header">
-                    <span>🏷️</span>
-                    <h3>Shop Identity</h3>
+
+                    <h3> 🏷️ Shop Identity</h3>
                   </div>
 
                   <div className="settings-form-group">
@@ -1579,8 +1579,7 @@ function ManagerPage() {
                 {/* COLUMN 2: CONTACT & ADDRESS */}
                 <div className="settings-card">
                   <div className="card-header">
-                    <span>📍</span>
-                    <h3>Contact & Address</h3>
+                    <h3>📍 Contact & Address</h3>
                   </div>
 
                   <div className="settings-form-group">
@@ -1619,8 +1618,8 @@ function ManagerPage() {
                 {/* COLUMN 3: TAX & COMPLIANCE */}
                 <div className="settings-card">
                   <div className="card-header">
-                    <span>⚖️</span>
-                    <h3>Tax & Compliance</h3>
+
+                    <h3>⚖️Tax & Compliance</h3>
                   </div>
 
                   <div className="tax-toggle-box">

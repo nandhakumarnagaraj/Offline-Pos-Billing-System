@@ -46,10 +46,20 @@ public class PrintingService {
     sb.append("-----------------------\n");
 
     if (payment != null) {
-      sb.append("Payment: ").append(payment.getPaymentMode()).append("\n");
+      if (payment.getPaymentMode() == com.biryanipos.backend.model.PaymentMode.MIXED && payment.getDetails() != null) {
+        sb.append("Payment Details:\n");
+        for (com.biryanipos.backend.model.PaymentDetail detail : payment.getDetails()) {
+          sb.append(String.format("  %-12s: %8.2f\n", detail.getPaymentMode(), detail.getAmount()));
+        }
+      } else {
+        sb.append("Payment Mode: ").append(payment.getPaymentMode()).append("\n");
+      }
+
       if (payment.getAmountReceived() > 0) {
-        sb.append(String.format("Received:       %8.2f\n", payment.getAmountReceived()));
-        sb.append(String.format("Change:         %8.2f\n", payment.getChangeReturned()));
+        sb.append(String.format("Total Received:  %8.2f\n", payment.getAmountReceived()));
+        if (payment.getChangeReturned() > 0) {
+          sb.append(String.format("Change:         %8.2f\n", payment.getChangeReturned()));
+        }
       }
     }
 

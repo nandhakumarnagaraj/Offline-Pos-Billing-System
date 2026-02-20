@@ -128,7 +128,17 @@ public class PaymentService {
     order.setTotalAmount(totalAmount);
     order.setCgst(cgst);
     order.setSgst(sgst);
-    order.setStatus(OrderStatus.PAID);
+
+    // Dine-in closes with PAID. Takeaway starts its KDS journey after payment.
+    if (order.getOrderType() == OrderType.DINE_IN) {
+      order.setStatus(OrderStatus.PAID);
+    } else {
+      // For Takeaway, ensuring it's at least NEW so it shows up in KDS column 1
+      if (order.getStatus() == null) {
+        order.setStatus(OrderStatus.NEW);
+      }
+    }
+
     order.setCompletedAt(LocalDateTime.now());
     orderRepository.save(order);
 
@@ -185,6 +195,12 @@ public class PaymentService {
       bill.setChangeReturned(payment.getChangeReturned());
       bill.setTransactionRef(payment.getTransactionRef());
       bill.setPaidAt(payment.getPaidAt() != null ? payment.getPaidAt().format(formatter) : "");
+
+      if (payment.getDetails() != null) {
+        bill.setPaymentModes(payment.getDetails().stream()
+            .map(d -> new BillResponse.PaymentModeDetail(d.getPaymentMode().name(), d.getAmount()))
+            .collect(java.util.stream.Collectors.toList()));
+      }
     } else {
       bill.setPaymentStatus(order.getPaymentStatus().name());
     }

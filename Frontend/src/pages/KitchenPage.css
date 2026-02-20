@@ -54,6 +54,10 @@
   color: #10B981;
 }
 
+.stat-served {
+  color: #3B82F6;
+}
+
 .stat-label {
   font-size: 0.7rem;
   color: #6B7280;
@@ -71,7 +75,7 @@
 .kds-body {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0;
   overflow: hidden;
 }
@@ -116,6 +120,10 @@
   color: #10B981;
 }
 
+.col-served {
+  color: #3B82F6;
+}
+
 .col-dot {
   width: 8px;
   height: 8px;
@@ -133,6 +141,10 @@
 
 .ready-dot {
   background: #10B981;
+}
+
+.served-dot {
+  background: #3B82F6;
 }
 
 .column-cards {
@@ -166,6 +178,11 @@
 
 .card-ready {
   border-left-color: #10B981;
+}
+
+.card-served {
+  border-left-color: #3B82F6;
+  opacity: 0.7;
 }
 
 .kds-card-top {
@@ -375,7 +392,7 @@
   }
 
   .kds-body {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .kds-column {

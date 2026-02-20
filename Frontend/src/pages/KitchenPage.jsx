@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { getKitchenOrders, updateOrderStatus, extendOrderTime } from '../service/api';
+import { getKitchenOrders, updateOrderStatus, extendOrderTime, getOrdersByDate } from '../service/api';
 import { connectWebSocket } from '../service/ws';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -9,6 +9,7 @@ import './KitchenPage.css';
 function KitchenPage() {
   const { logout } = useAuth();
   const [orders, setOrders] = useState([]);
+  const [dailyDeliveredCount, setDailyDeliveredCount] = useState(0);
   const [muted, setMuted] = useState(false);
   const audioRef = useRef(null);
 
@@ -21,9 +22,17 @@ function KitchenPage() {
   useEffect(() => {
     loadOrders();
     const stompClient = connectWebSocket((order) => {
+      // If order is delivered or paid today, update the count
+      if (order.status === 'SERVED' || order.status === 'PAID') {
+        // We re-fetch or use a more complex logic, but for now let's just refresh the count
+        // to be safe against double counting in state
+        refreshDailyCount();
+      }
+
       setOrders(prev => {
         const idx = prev.findIndex(o => o.id === order.id);
-        if (order.status === 'PAID' || order.status === 'CANCELLED' || order.status === 'SERVED') {
+        // Remove Dine-in if PAID. Takeaway stays until SERVED.
+        if (order.status === 'CANCELLED' || (order.status === 'PAID' && order.orderType === 'DINE_IN')) {
           return prev.filter(o => o.id !== order.id);
         }
         if (idx !== -1) {
@@ -47,10 +56,20 @@ function KitchenPage() {
     return () => { if (stompClient) stompClient.deactivate(); };
   }, []);
 
+  const refreshDailyCount = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const dailyRes = await getOrdersByDate(today, today);
+      const deliveredToday = dailyRes.data.filter(o => o.status === 'SERVED' || o.status === 'PAID').length;
+      setDailyDeliveredCount(deliveredToday);
+    } catch (err) { console.error(err); }
+  }
+
   const loadOrders = async () => {
     try {
       const res = await getKitchenOrders();
       setOrders(res.data);
+      refreshDailyCount();
     } catch (err) {
       console.error('Failed to load kitchen orders:', err);
     }
@@ -112,9 +131,15 @@ function KitchenPage() {
     );
   };
 
-  const newOrders = orders.filter(o => o.status === 'NEW');
-  const cookingOrders = orders.filter(o => o.status === 'COOKING');
-  const readyOrders = orders.filter(o => o.status === 'READY');
+  // ONLY show orders if it's DINE_IN (pay at end) OR it's a PAID Takeaway (pay first)
+  const kdsOrders = orders.filter(o =>
+    o.orderType === 'DINE_IN' || o.paymentStatus === 'COMPLETED'
+  );
+
+  const newOrders = kdsOrders.filter(o => o.status === 'NEW');
+  const cookingOrders = kdsOrders.filter(o => o.status === 'COOKING');
+  const readyOrders = kdsOrders.filter(o => o.status === 'READY');
+  const servedOrders = kdsOrders.filter(o => o.status === 'SERVED');
 
   return (
     <div className="kitchen-page">
@@ -140,6 +165,10 @@ function KitchenPage() {
           <div className="kds-stat">
             <span className="stat-num stat-ready">{readyOrders.length}</span>
             <span className="stat-label">Ready</span>
+          </div>
+          <div className="kds-stat">
+            <span className="stat-num stat-served">{dailyDeliveredCount}</span>
+            <span className="stat-label">Delivered</span>
           </div>
         </div>
         <div className="kds-controls">
@@ -252,8 +281,36 @@ function KitchenPage() {
                 </div>
                 <button className="btn btn-primary btn-block"
                   onClick={() => changeStatus(order.id, 'SERVED')}>
-                  🍽️ Mark Served
+                  🚚 Mark Delivered
                 </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* SERVED (Recently) */}
+        <div className="kds-column">
+          <div className="column-header col-served">
+            <span className="col-dot served-dot"></span>
+            DELIVERED ({servedOrders.length})
+          </div>
+          <div className="column-cards">
+            {servedOrders.map(order => (
+              <div key={order.id} className="kds-card card-served status-served-kds">
+                <div className="kds-card-top">
+                  <div className="kds-order-id">{order.id}</div>
+                  <div className="kds-table">{order.tableNumber === 'TAKEAWAY' ? '🥡 Takeaway' : (order.tableNumber || '🥡 Takeaway')}</div>
+                  <div className="kds-served-time">Served at {new Date(order.completedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                </div>
+                <div className="kds-items">
+                  {order.items?.map(item => (
+                    <div key={item.id} className="kds-item item-done">
+                      <span className="kds-qty">{item.quantity}x</span>
+                      <span className="kds-item-name">{item.menuItem?.name || 'Unknown'}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="served-label-badge">DELIVERED ✅</div>
               </div>
             ))}
           </div>

@@ -89,13 +89,13 @@ const ThermalReceipt = ({ billData, calc }) => {
             {billData.customerName && (
               <div className="info-item">
                 <span className="label">Cust:</span>
-                <span className="value">{maskString(billData.customerName)}</span>
+                <span className="value">{billData.customerName}</span>
               </div>
             )}
             {billData.customerPhone && (
               <div className="info-item text-right">
                 <span className="label">Phone:</span>
-                <span className="value">{maskString(billData.customerPhone)}</span>
+                <span className="value">{billData.customerPhone}</span>
               </div>
             )}
           </div>
@@ -171,9 +171,9 @@ const ThermalReceipt = ({ billData, calc }) => {
           <section className="payment-details">
             <div className="payment-title">PAYMENT DETAILS</div>
             {/* Split Payment Mode */}
-            {((calc.paymentMode === 'SPLIT' || billData.paymentMode === 'SPLIT') || (calc.paymentModes?.length > 0 || billData.paymentModes?.length > 0)) ? (
+            {((calc.paymentMode === 'SPLIT' || billData.paymentMode === 'SPLIT' || billData.paymentMode === 'MIXED') || (calc.paymentModes?.length > 0 || billData.paymentModes?.length > 0)) ? (
               <div className="split-payments">
-                {(calc.paymentModes || billData.paymentModes || []).map((p, i) => (
+                {(calc.paymentModes?.length > 0 ? calc.paymentModes : (billData.paymentModes || [])).map((p, i) => (
                   <div key={i} className="payment-row">
                     <span>{p.mode}</span>
                     <span>₹ {p.amount.toFixed(2)}</span>
@@ -189,7 +189,7 @@ const ThermalReceipt = ({ billData, calc }) => {
                 </div>
               )
             )}
-            
+
             <div className="divider-dashed"></div>
           </section>
         )}

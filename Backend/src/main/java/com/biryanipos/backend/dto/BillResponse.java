@@ -30,7 +30,16 @@ public class BillResponse {
   private String createdAt;
   private String paidAt;
 
+  private java.util.List<PaymentModeDetail> paymentModes;
   private java.util.List<BillItem> items;
+
+  @Data
+  @AllArgsConstructor
+  @NoArgsConstructor
+  public static class PaymentModeDetail {
+    private String mode;
+    private double amount;
+  }
 
   @Data
   @AllArgsConstructor

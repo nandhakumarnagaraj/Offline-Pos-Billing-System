@@ -37,9 +37,7 @@ export default function PaymentSuccessPage() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+
 
   const numberToWords = (num) => {
     const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
@@ -124,14 +122,14 @@ export default function PaymentSuccessPage() {
     // 2. Meta Information
     doc.setLineDashPattern([], 0);
     doc.setFontSize(8.5);
-    
+
     // Line 1: Bill No (Left) & Type (Right)
     doc.setFont("helvetica", "bold");
     doc.text("Bill No: ", 5, y);
     let labelWidth = doc.getTextWidth("Bill No: ");
     doc.setFont("helvetica", "normal");
     doc.text(`${billData.orderId}`, 5 + labelWidth, y);
-    
+
     doc.setFont("helvetica", "normal");
     let typeValue = billData.orderType?.replace('_', ' ') || '';
     doc.text(typeValue, 75, y, { align: 'right' });
@@ -188,13 +186,13 @@ export default function PaymentSuccessPage() {
     billData.items?.forEach((item, i) => {
       const itemName = item.name.toUpperCase();
       const splitName = doc.splitTextToSize(itemName, 30);
-      
+
       doc.text(`${i + 1}`, 5, y);
       doc.text(splitName, 10, y);
       doc.text(`${item.quantity}`, 42, y, { align: 'center' });
       doc.text(`${item.unitPrice.toFixed(2)}`, 58, y, { align: 'right' });
       doc.text(`${item.total.toFixed(2)}`, 75, y, { align: 'right' });
-      
+
       const itemHeight = (splitName.length * 3.5);
       y += Math.max(5, itemHeight);
     });
@@ -239,13 +237,13 @@ export default function PaymentSuccessPage() {
     // Payment Details in PDF
     const pMode = billData.paymentMode || 'ONLINE';
     const pModes = billData.paymentModes || [];
-    
+
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
     doc.text("PAYMENT DETAILS", 5, y);
     y += 4;
     doc.setFont("helvetica", "normal");
-    
+
     if (pModes.length > 0) {
       pModes.forEach(p => {
         doc.text(`${p.mode}`, 5, y);
@@ -292,51 +290,7 @@ export default function PaymentSuccessPage() {
     }
   }, [billData]);
 
-  const shareOnWhatsApp = async () => {
-    if (!billData) return;
-    setLoading(true);
-    try {
-      const file = await getBillPDFFile();
-      if (!file) return;
 
-      // 1. Prepare Data
-      const phone = billData.customerPhone || "";
-      const cleanPhone = phone.replace(/\D/g, '');
-      const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-
-      const totalAmount = shopConfig.gstEnabled ? billData.totalAmount : (billData.subtotal - (billData.discount || 0));
-      const message = `Here is your invoice for Order #${billData.orderId} from ${shopConfig.name}. Total: ₹${totalAmount.toFixed(2)}. \n\n(Note: Your Invoice PDF has been downloaded. Please attach it to this chat.)`;
-
-      const waUrl = `https://web.whatsapp.com/send/?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
-
-      // 2. Open WhatsApp Web FIRST (to ensure user context is used for the window)
-      // Browsers are more likely to allow window.open if it's the first "big" action
-      const waWindow = window.open(waUrl, '_blank');
-
-      if (!waWindow) {
-        // Fallback if window.open was blocked
-        toast.error("Popup blocked! Please allow popups for this site or use the button again.");
-      }
-
-      // 3. Trigger PDF Download (with a tiny delay to ensure window.open gets priority)
-      setTimeout(() => {
-        const url = URL.createObjectURL(file);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${shopConfig.name.replace(/\s+/g, '_')}_Bill_${billData.orderId}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        toast.success("Invoice PDF Downloaded & WhatsApp Opening...");
-      }, 300);
-
-    } catch (err) {
-      console.error("WhatsApp share failed", err);
-      toast.error("Failed to share invoice. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Prepare calc object for ThermalReceipt
   const calc = billData ? {
@@ -368,24 +322,7 @@ export default function PaymentSuccessPage() {
         </div>
       </div>
 
-      <div style={{ marginTop: 24, display: 'flex', gap: '12px' }}>
-        <button
-          className="btn btn-success btn-lg"
-          onClick={handlePrint}
-          disabled={!billData}
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-        >
-          🖨️ Print Invoice
-        </button>
-        <button
-          className="btn btn-primary btn-lg"
-          onClick={shareOnWhatsApp}
-          disabled={!billData}
-          style={{ flex: 1, backgroundColor: '#25D366', borderColor: '#25D366', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-        >
-          📱 Share WhatsApp
-        </button>
-      </div>
+
 
       <div style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
         <Link className="btn btn-primary" to="/">Go Home</Link>

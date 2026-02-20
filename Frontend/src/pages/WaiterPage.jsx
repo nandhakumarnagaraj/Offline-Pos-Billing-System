@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getAvailableMenuItems, createOrder, addItemsToOrder, getActiveOrders, getTables, getActiveCategories, getOrdersByDate, processPayment, getBill, initiateDigitalPayment, verifyEasebuzzPayment } from '../service/api';
+import { getAvailableMenuItems, createOrder, addItemsToOrder, getActiveOrders, getTables, getActiveCategories } from '../service/api';
 import { connectWebSocket } from '../service/ws';
 import { addPendingSync } from '../db';
 import { useAuth } from '../context/AuthContext';
@@ -29,21 +29,19 @@ function WaiterPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showVariationModal, setShowVariationModal] = useState(null); // { item }
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [billData, setBillData] = useState(null);
-  const [paymentMode, setPaymentMode] = useState('CASH');
-  const [amountReceived, setAmountReceived] = useState('');
-  const [discount, setDiscount] = useState('');
-  const [isMultiPay, setIsMultiPay] = useState(false);
-  const [addedPayments, setAddedPayments] = useState([]);
-  const [upiId, setUpiId] = useState('');
-  const [qrCodeData, setQrCodeData] = useState(null);
-  const [whatsappPhone, setWhatsappPhone] = useState('');
-  const [multiPayMode, setMultiPayMode] = useState('CASH');
 
   useEffect(() => {
     loadData();
     const stompClient = connectWebSocket(
       (order) => {
+        if (order.status === 'READY') {
+          toast.success(`🍽️ Order #${order.id} for Table ${order.tableNumber} is READY!`, {
+            duration: 5000,
+            icon: '🔥'
+          });
+          // Play a subtle notification sound if possible? 
+          // User only asked for toast.
+        }
         setActiveOrders(prev => {
           const index = prev.findIndex(o => o.id === order.id);
           if (index !== -1) {
@@ -65,15 +63,7 @@ function WaiterPage() {
     return () => { if (stompClient) stompClient.deactivate(); };
   }, []);
 
-  useEffect(() => {
-    const { total } = calculateBill();
-    // Only prefill in Single Payment mode (where isMultiPay is false)
-    if (!isMultiPay && paymentMode === 'CASH' && total) {
-      setAmountReceived(total.toFixed(2));
-    } else if (!isMultiPay) {
-      setAmountReceived('');
-    }
-  }, [paymentMode, billData, discount, isMultiPay]);
+
 
   const loadData = async () => {
     try {
@@ -100,6 +90,11 @@ function WaiterPage() {
       return matchesCategory && matchesSearch;
     });
   }, [menuItems, activeCategory, searchQuery]);
+
+  // Waiters only care about Dine-In orders
+  const waiterActiveOrders = useMemo(() => {
+    return activeOrders.filter(o => o.orderType !== 'TAKEAWAY');
+  }, [activeOrders]);
 
   const addToCart = (item, variation = null) => {
     if (item.variations && item.variations.length > 0 && !variation) {
@@ -226,209 +221,7 @@ function WaiterPage() {
     setLoading(false);
   };
 
-  const selectForBilling = async (order) => {
-    setSelectedOrder(order);
-    try {
-      const res = await getBill(order.id);
-      setBillData(res.data);
-      setWhatsappPhone(res.data.customerPhone || '');
-      setView('bill');
-      setDiscount('');
-      setAmountReceived('');
-      setIsMultiPay(false);
-      setAddedPayments([]);
-      setPaymentMode('CASH');
-    } catch (err) { console.error(err); }
-  };
 
-  const handlePayment = async () => {
-    if (!selectedOrder) return;
-    const isOnline = !isMultiPay ? (paymentMode === 'ONLINE') : addedPayments.some(p => p.mode === 'ONLINE');
-    if (isOnline && (!whatsappPhone || whatsappPhone.trim().length < 10)) {
-      toast.error('Customer WhatsApp number is required for digital payments');
-      return;
-    }
-    setLoading(true);
-    try {
-      const payload = {
-        orderId: selectedOrder.id,
-        discount: parseFloat(discount) || 0,
-        transactionRef: ''
-      };
-
-      if (isMultiPay) {
-        payload.paymentModes = addedPayments;
-        payload.amountReceived = addedPayments.reduce((sum, p) => sum + p.amount, 0);
-      } else {
-        payload.paymentMode = paymentMode;
-        payload.amountReceived = parseFloat(amountReceived) || 0;
-      }
-
-      // Compute the total bill amount fresh (not from stale calc)
-      const disc = parseFloat(discount) || 0;
-      let freshTotal = 0;
-      if (billData) {
-        let totalCgst = 0, totalSgst = 0;
-        billData.items?.forEach(item => {
-          const itemGst = item.gstPercent || shopConfig.gstPercentage;
-          const itemTax = (item.total * (itemGst / 100));
-          totalCgst += itemTax / 2;
-          totalSgst += itemTax / 2;
-        });
-        const sub = billData.subtotal - disc;
-        const cgst = shopConfig.gstEnabled ? Math.round(totalCgst * 100) / 100 : 0;
-        const sgst = shopConfig.gstEnabled ? Math.round(totalSgst * 100) / 100 : 0;
-        freshTotal = Math.round(sub + cgst + sgst);
-      }
-
-      // Check if digital payment is needed
-      let onlinePay = isMultiPay ? addedPayments.find(p => p.mode === 'ONLINE') : null;
-
-      // If in Split Mode and Easebuzz is selected in dropdown but NOT added to list yet,
-      // compute remaining balance directly from addedPayments
-      if (isMultiPay && !onlinePay && multiPayMode === 'ONLINE') {
-        const totalPaidSoFar = addedPayments.reduce((sum, p) => sum + p.amount, 0);
-        const remaining = Math.max(0, freshTotal - totalPaidSoFar);
-        if (remaining > 0) {
-          onlinePay = { mode: 'ONLINE', amount: remaining };
-        }
-      }
-
-      const isDigital = (!isMultiPay && paymentMode === 'ONLINE') || (isMultiPay && onlinePay);
-
-      if (isDigital) {
-        try {
-          const splitAmt = isMultiPay ? onlinePay.amount : freshTotal;
-          // Metadata: all non-ONLINE payments in the addedPayments list
-          const nonOnlineParts = addedPayments.filter(p => p.mode !== 'ONLINE');
-          const metadata = isMultiPay && nonOnlineParts.length > 0
-            ? nonOnlineParts.map(p => `${p.mode}:${p.amount}`).join(',')
-            : '';
-
-          console.log('[Split Payment] splitAmt:', splitAmt, '| metadata:', metadata, '| freshTotal:', freshTotal, '| addedPayments:', addedPayments);
-
-          const res = await initiateDigitalPayment(selectedOrder.id, disc, 'ONLINE', splitAmt, metadata);
-
-          if (res.data.status === 'success') {
-            const capturedOrderId = selectedOrder.id;
-            const capturedDiscount = parseFloat(discount) || 0;
-
-            // Easebuzz Checkout v2
-            const easebuzzCheckout = new window.EasebuzzCheckout(res.data.accessKey, 'test');
-            const options = {
-              access_key: res.data.accessKey,
-              onResponse: async (response) => {
-                console.log('Easebuzz response:', response);
-                if (response.status === 'success') {
-                  setLoading(true);
-                  try {
-                    const verifyRes = await verifyEasebuzzPayment({
-                      txnid: response.txnid,
-                      status: response.status,
-                      easepay_id: response.easepay_id,
-                      hash: response.hash,
-                      amount: response.amount,
-                      productinfo: response.productinfo,
-                      firstname: response.firstname,
-                      email: response.email,
-                      order_id: capturedOrderId,
-                      discount: capturedDiscount
-                    });
-
-                    if (verifyRes.data.status === 'success') {
-                      toast.success('Payment Verified Successfully!');
-                      navigate(`/payment-success?orderId=${capturedOrderId}&txnid=${response.txnid}`);
-                    } else {
-                      toast.error('Verification failed: ' + verifyRes.data.message);
-                      setLoading(false);
-                    }
-                  } catch (err) {
-                    console.error('Verification API Error:', err);
-                    toast.error(err.response?.data?.message || 'Payment verification failed');
-                    setLoading(false);
-                  }
-                } else if (response.status === 'failure') {
-                  toast.error('Payment Failed: ' + (response.error_Message || 'Transaction failed'));
-                  setLoading(false);
-                } else if (response.status === 'userCancelled') {
-                  toast('Payment cancelled. You can try again.', { icon: '⚠️' });
-                  setLoading(false);
-                } else {
-                  toast.error('Payment status: ' + response.status);
-                  setLoading(false);
-                }
-              },
-              theme: '#3399cc'
-            };
-
-            easebuzzCheckout.initiatePayment(options);
-
-          } else {
-            toast.error('Easebuzz Error: ' + res.data.message);
-            setLoading(false);
-          }
-        } catch (err) {
-          toast.error('Failed to initiate digital payment: ' + (err.response?.data?.message || err.message));
-          setLoading(false);
-        }
-        return;
-      }
-
-      await processPayment(payload);
-      toast.success('Payment processed!');
-      setSelectedOrder(null);
-      setBillData(null);
-      setView('orders');
-      loadData();
-    } catch (err) {
-      if (!navigator.onLine || err.code === 'ERR_NETWORK') {
-        const paymentData = {
-          orderId: selectedOrder.id,
-          discount: parseFloat(discount) || 0,
-          transactionRef: '',
-          paymentModes: isMultiPay ? addedPayments : undefined,
-          paymentMode: isMultiPay ? undefined : paymentMode,
-          amountReceived: isMultiPay ? addedPayments.reduce((sum, p) => sum + p.amount, 0) : (parseFloat(amountReceived) || 0)
-        };
-        await addPendingSync('PROCESS_PAYMENT', paymentData);
-        toast('Network error: Payment saved LOCALLY. It will sync automatically when online.', { icon: '📡' });
-
-        setSelectedOrder(null);
-        setBillData(null);
-        setView('orders');
-      } else {
-        toast.error('Payment failed: ' + (err.response?.data?.message || err.message));
-      }
-    }
-    setLoading(false);
-  };
-
-  const calculateBill = () => {
-    if (!billData) return {};
-    const disc = parseFloat(discount) || 0;
-    let totalCgst = 0;
-    let totalSgst = 0;
-
-    billData.items?.forEach(item => {
-      const itemGst = item.gstPercent || shopConfig.gstPercentage;
-      const itemTax = (item.total * (itemGst / 100));
-      totalCgst += itemTax / 2;
-      totalSgst += itemTax / 2;
-    });
-
-    const sub = billData.subtotal - disc;
-    const cgst = shopConfig.gstEnabled ? Math.round(totalCgst * 100) / 100 : 0;
-    const sgst = shopConfig.gstEnabled ? Math.round(totalSgst * 100) / 100 : 0;
-    const total = Math.round(sub + cgst + sgst);
-    const received = parseFloat(amountReceived) || 0;
-    const change = received > total ? received - total : 0;
-    const totalPaidSoFar = addedPayments.reduce((sum, p) => sum + p.amount, 0);
-    const multiPayRemaining = Math.max(0, total - totalPaidSoFar);
-
-    return { sub, cgst, sgst, total, change, multiPayRemaining, totalPaidSoFar };
-  };
-
-  const calc = calculateBill();
 
   return (
     <div className="waiter-page">
@@ -437,7 +230,7 @@ function WaiterPage() {
         <div className="counter-header-left">
           <Link to="/" className="back-btn">←</Link>
           <div className="header-title-group">
-            <h1>🧑‍🍳 Waiter</h1>
+            <h1>Waiter</h1>
           </div>
         </div>
 
@@ -447,10 +240,10 @@ function WaiterPage() {
             Tables
           </button>
           <button className={`tab ${view === 'menu' ? 'active' : ''}`} onClick={() => setView('menu')}>
-            DineIn Order
+            Manage Order
           </button>
           <button className={`tab ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>
-            Active Orders <span className="tab-count">{activeOrders.length}</span>
+            Active Orders <span className="tab-count">{waiterActiveOrders.length}</span>
           </button>
           <button className="btn btn-outline btn-sm logout-btn-header" onClick={logout} style={{ marginLeft: '16px' }}>Sign Out</button>
         </nav>
@@ -533,7 +326,7 @@ function WaiterPage() {
               {/* Right Side: New Order Cart (Identical to Cashier) */}
               <div className="takeaway-cart glass-card">
                 <div className="flex-between">
-                  <h3>DineIn Order</h3>
+                  <h3>Dine In Order</h3>
                   <div className="selected-info">
                     {selectedTable ? (
                       <span className="badge badge-success">Table {selectedTable}</span>
@@ -612,14 +405,14 @@ function WaiterPage() {
         {view === 'orders' && (
           <div className="orders-view animate-fadeIn">
             <h2 className="view-title">Active Orders Tracking</h2>
-            {activeOrders.length === 0 && (
+            {waiterActiveOrders.length === 0 && (
               <div className="empty-state-orders">
                 <div className="empty-icon">📝</div>
-                <p>No active orders at the moment</p>
+                <p>No active dine-in orders at the moment</p>
               </div>
             )}
             <div className="orders-grid-modern">
-              {activeOrders.map(order => (
+              {waiterActiveOrders.map(order => (
                 <div key={order.id} className={`modern-order-card status-${order.status?.toLowerCase()}`} onClick={() => editOrder(order)}>
                   <div className="m-order-header">
                     <div className="m-order-id-group">
@@ -646,195 +439,7 @@ function WaiterPage() {
             </div>
           </div>
         )}
-        {/* BILL VIEW (Identical to Cashier Invoice/Payment) */}
-        {view === 'bill' && billData && (
-          <div className="bill-view animate-fadeIn">
-            <div className="bill-container">
-              {/* Bill Preview */}
-              <div className="bill-preview glass-card">
-                <div className="bill-header-sec">
-                  <div className="flex-between">
-                    <h2>🧾 Invoice</h2>
-                  </div>
-                  <div className="bill-meta">
-                    <div>Order {billData.orderId}</div>
-                    <div>Table: {billData.tableNumber}</div>
-                    <div>Type: {billData.orderType?.replace('_', ' ')}</div>
-                    {billData.customerName && <div>Customer: {billData.customerName}</div>}
-                    <div>Date: {billData.createdAt}</div>
-                  </div>
-                </div>
 
-                <table className="bill-table">
-                  <thead>
-                    <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
-                  </thead>
-                  <tbody>
-                    {billData.items?.map((item, i) => (
-                      <tr key={i}>
-                        <td>{item.name}</td>
-                        <td>{item.quantity}</td>
-                        <td>₹{item.unitPrice.toFixed(2)}</td>
-                        <td>₹{item.total.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                <div className="bill-totals">
-                  <div className="bill-row"><span>Subtotal</span><span>₹{billData.subtotal?.toFixed(2)}</span></div>
-                  {parseFloat(discount) > 0 && (
-                    <div className="bill-row discount"><span>Discount</span><span>-₹{parseFloat(discount).toFixed(2)}</span></div>
-                  )}
-                  {shopConfig.gstEnabled && (
-                    <>
-                      <div className="bill-row"><span>CGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.cgst?.toFixed(2)}</span></div>
-                      <div className="bill-row"><span>SGST ({shopConfig.gstPercentage / 2}%)</span><span>₹{calc.sgst?.toFixed(2)}</span></div>
-                    </>
-                  )}
-                  <div className="bill-row bill-grand-total">
-                    <span>Grand Total</span>
-                    <span>₹{calc.total?.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Panel */}
-              <div className="payment-panel glass-card">
-                <div className="flex-between">
-                  <h3>Payment</h3>
-                </div>
-
-                {paymentMode !== 'SPLIT' ? (
-                  <>
-                    <div className="payment-modes">
-                      {['CASH', 'ONLINE', 'SPLIT'].map(mode => (
-                        <button key={mode}
-                          className={`payment-mode-btn ${paymentMode === mode ? 'active' : ''}`}
-                          onClick={() => {
-                            setPaymentMode(mode);
-                            if (mode === 'SPLIT') {
-                              setIsMultiPay(true);
-                              setAddedPayments([]);
-                            } else {
-                              setIsMultiPay(false);
-                            }
-                          }}>
-                          <span className="mode-icon">
-                            {mode === 'CASH' ? '💵' : mode === 'ONLINE' ? '🌐' : '⚖️'}
-                          </span>
-                          <span className="mode-name">
-                            {mode === 'ONLINE' ? 'Easebuzz' : mode === 'SPLIT' ? 'Split Payment' : mode}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="payment-fields">
-                      {paymentMode === 'ONLINE' && (
-                        <div className="whatsapp-field" style={{ marginBottom: '16px' }}>
-                          <label>Customer WhatsApp <span style={{ color: '#EF4444' }}>*</span></label>
-                          <input className="input" type="text" placeholder="10-digit number" value={whatsappPhone}
-                            onChange={e => setWhatsappPhone(e.target.value)} required />
-                        </div>
-                      )}
-
-                      <label>Discount (₹)</label>
-                      <input className="input" type="number" placeholder="0" value={discount}
-                        onChange={e => setDiscount(e.target.value)} />
-
-                      {paymentMode === 'CASH' && (
-                        <>
-                          <label>Amount Received (₹)</label>
-                          <input className="input" type="number" placeholder="0" value={amountReceived}
-                            onChange={e => setAmountReceived(e.target.value)} />
-                          {calc.change > 0 && (
-                            <div className="change-display" style={{ marginTop: '10px', color: '#10B981', fontWeight: 'bold' }}>
-                              Change: ₹{calc.change.toFixed(2)}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="multi-pay-section animate-fadeIn">
-                    <div className="payment-modes" style={{ marginBottom: '20px' }}>
-                      {['CASH', 'ONLINE', 'SPLIT'].map(mode => (
-                        <button key={mode}
-                          className={`payment-mode-btn ${paymentMode === mode ? 'active' : ''}`}
-                          onClick={() => {
-                            setPaymentMode(mode);
-                            if (mode === 'SPLIT') {
-                              setIsMultiPay(true);
-                            } else {
-                              setIsMultiPay(false);
-                              setAddedPayments([]);
-                            }
-                          }}>
-                          <span className="mode-icon">
-                            {mode === 'CASH' ? '💵' : mode === 'ONLINE' ? '🌐' : '⚖️'}
-                          </span>
-                          <span className="mode-name">
-                            {mode === 'ONLINE' ? 'Easebuzz' : mode === 'SPLIT' ? 'Split Payment' : mode}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    <label>Discount (₹)</label>
-                    <input className="input" type="number" placeholder="0" value={discount}
-                      onChange={e => setDiscount(e.target.value)} />
-
-                    <div className="payment-summary-box">
-                      <div>Total Due: <strong>₹{calc.total.toFixed(2)}</strong></div>
-                      <div style={{ color: calc.multiPayRemaining > 0 ? '#EF4444' : '#10B981' }}>
-                        Remaining: <strong>₹{calc.multiPayRemaining.toFixed(2)}</strong>
-                      </div>
-                    </div>
-
-                    <div className="add-payment-row">
-                      <select className="input" value={multiPayMode} onChange={e => {
-                        const val = e.target.value;
-                        setMultiPayMode(val);
-                        if (val === 'ONLINE') {
-                          setAmountReceived(calc.multiPayRemaining.toFixed(2));
-                        }
-                      }}>
-                        <option value="CASH">Cash</option>
-                        <option value="ONLINE">Easebuzz</option>
-                      </select>
-                      <input className="input" type="number" placeholder="Amount"
-                        value={amountReceived} onChange={e => setAmountReceived(e.target.value)} />
-                      <button className="btn btn-sm btn-primary" onClick={() => {
-                        const amt = parseFloat(amountReceived);
-                        if (isNaN(amt) || amt <= 0) return;
-                        setAddedPayments([...addedPayments, { mode: multiPayMode, amount: amt }]);
-                        setAmountReceived('');
-                      }} disabled={!amountReceived}>Add</button>
-                    </div>
-                  </div>
-                )}
-
-
-                <div className="payment-actions">
-                  <button className="btn btn-outline" onClick={() => { setView('orders'); setSelectedOrder(null); }}>
-                    Cancel
-                  </button>
-                  <button className="btn btn-success btn-lg" onClick={handlePayment}
-                    disabled={loading || (isMultiPay && calc.multiPayRemaining > 0 && multiPayMode !== 'ONLINE')}>
-                    {loading ? '⏳ Processing...' : (
-                      isMultiPay
-                        ? (multiPayMode === 'ONLINE' && calc.multiPayRemaining > 0
-                          ? `✅ Settle (₹${calc.multiPayRemaining.toFixed(2)} via Easebuzz)`
-                          : '✅ Settle Bill')
-                        : `✅ Pay ₹${calc.total?.toFixed(2)}`
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
       </div>
 

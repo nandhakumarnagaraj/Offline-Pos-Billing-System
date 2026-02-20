@@ -5,7 +5,6 @@ import { ConfigProvider, useConfig } from './context/ConfigContext';
 import { getDashboard } from './service/api';
 import { Toaster } from 'react-hot-toast';
 import SyncManager from './components/SyncManager';
-import './App.css';
 
 // Lazy Load Pages for Performance
 const LoginPage = lazy(() => import('./pages/LoginPage'));

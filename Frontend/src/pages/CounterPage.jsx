@@ -54,6 +54,12 @@ function CounterPage() {
     loadTakeawayData();
     const stompClient = connectWebSocket(
       (order) => {
+        if (order.status === 'SERVED') {
+          toast.success(`💰 Order #${order.id} (Table ${order.tableNumber}) is DELIVERED. Ready for Payment!`, {
+            duration: 7000,
+            icon: '💵'
+          });
+        }
         setOrders(prev => {
           const idx = prev.findIndex(o => o.id === order.id);
           // If PAID or CANCELLED, always remove from active orders
@@ -134,6 +140,12 @@ function CounterPage() {
     try {
       const res = await getBill(order.id);
       setBillData(res.data);
+      // Reset payment UI states to avoid showing active session data on reprints
+      setPaymentMode(res.data.paymentMode || 'CASH');
+      setAddedPayments([]);
+      setAmountReceived('');
+      setIsMultiPay(false);
+
       // For PAID orders, we should use the actual discount from the order
       setDiscount(order.discount || 0);
       setTimeout(() => window.print(), 500);
@@ -148,7 +160,13 @@ function CounterPage() {
     try {
       const res = await getBill(order.id);
       const bData = res.data;
+
+      // Sync local state for PDF generation (disc is important for final total calc)
       const disc = order.discount || 0;
+      setDiscount(disc);
+      setBillData(bData);
+      setPaymentMode(bData.paymentMode || 'CASH');
+      setAddedPayments([]);
 
       const file = await getBillPDFFile(bData, disc);
       if (!file) return;
@@ -167,7 +185,7 @@ function CounterPage() {
       const phone = bData.customerPhone || "";
       const cleanPhone = phone.replace(/\D/g, '');
       const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-      const message = `Here is your invoice for Order #${bData.orderId} from ${shopConfig.name}. Total: ₹${total.toFixed(2)}. \n\n(Note: Your Invoice PDF has been downloaded. Please attach it to this chat.)`;
+      const message = `Here is your invoice for Order #${bData.orderId} from ${shopConfig.name}. Total: ₹${total.toFixed(2)}.`;
 
       const waUrl = `https://web.whatsapp.com/send/?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
 
@@ -301,10 +319,23 @@ function CounterPage() {
 
       await processPayment(payload);
 
+      // IMPORTANT: Fetch the finalized bill data AFTER payment to include payment breakdown/modes
+      let finalBillRes;
+      try {
+        finalBillRes = await getBill(selectedOrder.id);
+        setBillData(finalBillRes.data);
+      } catch (e) {
+        console.error("Failed to refresh bill data after payment", e);
+      }
+
       toast.success('Payment processed!');
 
-      // Automatically trigger WhatsApp Web Share
-      await autoShareWhatsAppBill();
+      // Automatically trigger WhatsApp Web Share with FRESH data (breakdown included)
+      if (finalBillRes?.data) {
+        await autoShareWhatsAppBill(finalBillRes.data);
+      } else {
+        await autoShareWhatsAppBill();
+      }
 
       setSelectedOrder(null);
       setBillData(null);
@@ -589,13 +620,13 @@ function CounterPage() {
       const itemName = item.name.toUpperCase();
       // Split text into multiple lines if too long (max width ~30mm)
       const splitName = doc.splitTextToSize(itemName, 30);
-      
+
       doc.text(`${i + 1}`, 5, y);
       doc.text(splitName, 10, y);
       doc.text(`${item.quantity}`, 42, y, { align: 'center' });
       doc.text(`${item.unitPrice.toFixed(2)}`, 58, y, { align: 'right' });
       doc.text(`${item.total.toFixed(2)}`, 75, y, { align: 'right' });
-      
+
       // Calculate how much space this item took
       const itemHeight = (splitName.length * 3.5);
       y += Math.max(5, itemHeight);
@@ -649,15 +680,15 @@ function CounterPage() {
 
     // Payment Details in PDF
     const pMode = data.paymentMode || paymentMode;
-    const pModes = data.paymentModes || (pMode === 'SPLIT' ? addedPayments : []);
-    
+    const pModes = (data.paymentModes && data.paymentModes.length > 0) ? data.paymentModes : addedPayments;
+
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
     doc.text("PAYMENT DETAILS", 5, y);
     y += 4;
     doc.setFont("helvetica", "normal");
-    
-    if (pMode === 'SPLIT' || pModes.length > 0) {
+
+    if (pModes && pModes.length > 0) {
       pModes.forEach(p => {
         doc.text(`${p.mode}`, 5, y);
         doc.text(`${p.amount.toFixed(2)}`, 75, y, { align: 'right' });
@@ -693,23 +724,24 @@ function CounterPage() {
     return new File([pdfBlob], `${shopConfig.name.replace(/\s+/g, '_')}_Bill_${data.orderId}.pdf`, { type: 'application/pdf' });
   };
 
-  const autoShareWhatsAppBill = async () => {
-    if (!billData) return;
+  const autoShareWhatsAppBill = async (customData = null) => {
+    const data = customData || billData;
+    if (!data) return;
     try {
-      const file = await getBillPDFFile();
+      const file = await getBillPDFFile(data);
       if (!file) return;
 
-      const phone = billData.customerPhone || "";
+      const phone = data.customerPhone || "";
       const cleanPhone = phone.replace(/\D/g, '');
       const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-      
-      const message = `Here is your invoice for Order #${billData.orderId} from ${shopConfig.name}. Total: ₹${calc.total.toFixed(2)}. \n\n(Note: Your Invoice PDF has been downloaded. Please attach it to this chat.)`;
+
+      const message = `Here is your invoice for Order #${billData.orderId} from ${shopConfig.name}. Total: ₹${calc.total.toFixed(2)}.`;
 
       const waUrl = `https://web.whatsapp.com/send/?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
 
       // Open WhatsApp Web
       const waWindow = window.open(waUrl, '_blank');
-      
+
       // Trigger PDF Download
       setTimeout(() => {
         const url = URL.createObjectURL(file);
@@ -753,7 +785,7 @@ function CounterPage() {
     const totalPaidSoFar = addedPayments.reduce((sum, p) => sum + p.amount, 0);
     const multiPayRemaining = Math.max(0, total - totalPaidSoFar);
 
-    return { 
+    return {
       sub, cgst, sgst, total, change, multiPayRemaining, totalPaidSoFar,
       paymentMode,
       paymentModes: addedPayments,
@@ -762,14 +794,21 @@ function CounterPage() {
   };
 
   const calc = calculateBill();
-  const activeOrdersList = orders.filter(o => o.status !== 'PAID' && o.status !== 'CANCELLED' && o.orderType !== 'TAKEAWAY');
+  const activeOrdersList = orders
+    .filter(o => o.status !== 'PAID' && o.status !== 'CANCELLED' && o.orderType !== 'TAKEAWAY')
+    .sort((a, b) => {
+      // Priority for the Cashier: Served (at table) > Ready in Kitchen > Cooking > New
+      const priority = { 'SERVED': 0, 'READY': 1, 'COOKING': 2, 'NEW': 3 };
+      return (priority[a.status] ?? 4) - (priority[b.status] ?? 4);
+    });
 
   return (
     <div className="counter-page">
-      <header className="counter-header">
+      <header className="counter-header 
+      counter-header">
         <div className="counter-header-left">
           <Link to="/" className="back-btn">←</Link>
-          <h1>💰 Counter</h1>
+          <h1>Counter</h1>
         </div>
         <nav className="counter-tabs">
           <button className={`tab ${view === 'pending' ? 'active' : ''}`} onClick={() => { setView('pending'); setSelectedOrder(null); }}>
@@ -779,7 +818,7 @@ function CounterPage() {
             Takeaway
           </button>
           <button className={`tab ${view === 'history' ? 'active' : ''}`} onClick={() => { setView('history'); setSelectedOrder(null); }}>
-            All Orders
+            Orders
           </button>
           <button className="btn btn-outline btn-sm logout-btn-header" onClick={logout} style={{ marginLeft: '16px' }}>Sign Out</button>
         </nav>
@@ -1095,6 +1134,27 @@ function CounterPage() {
                   <button className="btn btn-outline" onClick={() => { setView('pending'); setSelectedOrder(null); }}>
                     Cancel
                   </button>
+                  {selectedOrder.orderType === 'TAKEAWAY' && (
+                    <button className="btn btn-warning" onClick={() => {
+                      // Switch back to takeaway view and load this order into the cart/fields
+                      setCustomerName(selectedOrder.customerName || '');
+                      setCustomerPhone(selectedOrder.customerPhone || '');
+                      // Load existing items into cart for editing
+                      const newCart = {};
+                      selectedOrder.items?.forEach(i => {
+                        const key = i.variationId ? `${i.menuItem.id}-${i.variationId}` : `${i.menuItem.id}`;
+                        newCart[key] = {
+                          item: i.menuItem,
+                          variation: i.variationId ? i.menuItem.variations?.find(v => v.id === i.variationId) : null,
+                          qty: i.quantity
+                        };
+                      });
+                      setCart(newCart);
+                      setView('takeaway');
+                    }}>
+                      ✏️ Edit Order
+                    </button>
+                  )}
                   <button className="btn btn-success" onClick={handlePayment}
                     disabled={loading || (isMultiPay && calc.multiPayRemaining > 0 && multiPayMode !== 'ONLINE')}>
                     {loading ? '⏳ Processing...' : (
@@ -1133,7 +1193,7 @@ function CounterPage() {
                       <td className="time-cell">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}</td>
                       <td>
                         <div className="action-cell" style={{ display: 'flex', gap: '4px' }}>
-                          {order.status === 'PAID' && (
+                          {(order.status === 'PAID' || (order.orderType === 'TAKEAWAY' && order.status === 'SERVED')) && (
                             <>
                               <button className="btn btn-xs btn-primary" onClick={(e) => {
                                 e.stopPropagation();
